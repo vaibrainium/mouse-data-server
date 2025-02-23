@@ -5,28 +5,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.subplots as sp
 import streamlit as st
+import os
+import dotenv
+dotenv.load_dotenv()
 
-# def login():
-#     # Create a simple login form
-#     username = st.text_input("Username")
-#     password = st.text_input("Password", type="password")
-
-#     if st.button("Login"):
-#         if username == "" and password == "password123":
-#             st.success("Logged in successfully")
-#             return True
-#         else:
-#             st.error("Invalid username or password")
-#             return False
-#     return False
-
-# if login():
-#     st.write("Welcome to the Streamlit app!")
-
-
+PROCESSED_DATA_DIR = Path(os.getenv("PROCESSED_DATA_DIR"))
 
 # Constants
-DATA_DIR = Path("~/mouse-data-server/data").expanduser()
 TEXTWIDTH = 5.0
 FONTSIZE = 5.0
 COLOR = ["#d11149", "#1a8fe3", "#1ccd6a", "#e6c229", "#6610f2", "#f17105", "#65e5f3", "#bd8ad5", "#b16b57"]
@@ -39,9 +24,9 @@ st.markdown("<h1 style='text-align: center;'>Mouse Training Data</h1>", unsafe_a
 # Load Data
 def load_data():
     """Load session info and analyzed data."""
-    session_info = pd.read_csv(DATA_DIR / "session_info.csv")
+    session_info = pd.read_csv(PROCESSED_DATA_DIR / "session_info.csv")
     session_info["date"] = pd.to_datetime(session_info["date"]).dt.date
-    with open(DATA_DIR / "analyzed_data.pkl", "rb") as f:
+    with open(PROCESSED_DATA_DIR / "analyzed_data.pkl", "rb") as f:
         analyzed_data = pickle.load(f)
     return session_info, analyzed_data
 
@@ -275,28 +260,6 @@ if start_date and end_date:
                         row=1,
                         col=3,
                     )
-                    fig.add_trace(
-                        go.Scatter(
-                            x=[0, max(session_data["rolling_trials"])],
-                            y=[0.25, 0.25],
-                            mode="lines",
-                            line=dict(color="black", dash="dash"),
-                            name="Threshold 0.25",
-                        ),
-                        row=1,
-                        col=3,
-                    )
-                    fig.add_trace(
-                        go.Scatter(
-                            x=[0, max(session_data["rolling_trials"])],
-                            y=[-0.25, -0.25],
-                            mode="lines",
-                            line=dict(color="black", dash="dash"),
-                            name="Threshold -0.25",
-                        ),
-                        row=1,
-                        col=3,
-                    )
 
                     fig.add_trace(
                         go.Scatter(
@@ -316,6 +279,29 @@ if start_date and end_date:
                         row=1,
                         col=4,
                     )
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=[0, max(session_data["rolling_trials"])],
+                        y=[0.25, 0.25],
+                        mode="lines",
+                        line=dict(color="black", dash="dash"),
+                        name="Threshold 0.25",
+                    ),
+                    row=1,
+                    col=3,
+                )
+                fig.add_trace(
+                    go.Scatter(
+                        x=[0, max(session_data["rolling_trials"])],
+                        y=[-0.25, -0.25],
+                        mode="lines",
+                        line=dict(color="black", dash="dash"),
+                        name="Threshold -0.25",
+                    ),
+                    row=1,
+                    col=3,
+                )
 
                 fig.update_layout(
                     title=title,
