@@ -1,9 +1,10 @@
-[server]
-port = 8502
-headless = true
-runOnSave = false
-baseUrlPath = ""
-
 [browser]
 serverAddress = "localhost"
 serverPort = 8502
+
+[server]
+port = 8502
+headless = true
+baseUrlPath = "/training-data"
+enableCORS = false
+enableXsrfProtection = false

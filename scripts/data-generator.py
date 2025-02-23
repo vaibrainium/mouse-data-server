@@ -7,8 +7,9 @@ import pandas as pd
 
 from utils import pmf_utils
 
-DATA_DIR = data_dir = Path("~/data")
-OUTPUT_DATA_DIR = Path("~/mouse-data-server/data")
+
+DATA_DIR = data_dir = Path("~/data/").expanduser()
+OUTPUT_DATA_DIR = Path("~/mouse-data-server/data").expanduser()
 
 
 def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=None):
@@ -74,8 +75,6 @@ def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=Non
 def preprocess_data(data):
     data = data.dropna(subset=["outcome"])
     data = data[data.is_correction_trial == False]
-    # if "is_repeat_trial" in data.columns:
-    #     data = data[data.is_repeat_trial == False]
     if "in_active_bias_correction_block" in data.columns:
         data = data[data.in_active_bias_correction_block == False]
     return data

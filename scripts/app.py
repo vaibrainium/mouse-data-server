@@ -6,8 +6,27 @@ import plotly.graph_objects as go
 import plotly.subplots as sp
 import streamlit as st
 
+# def login():
+#     # Create a simple login form
+#     username = st.text_input("Username")
+#     password = st.text_input("Password", type="password")
+
+#     if st.button("Login"):
+#         if username == "" and password == "password123":
+#             st.success("Logged in successfully")
+#             return True
+#         else:
+#             st.error("Invalid username or password")
+#             return False
+#     return False
+
+# if login():
+#     st.write("Welcome to the Streamlit app!")
+
+
+
 # Constants
-DATA_DIR = Path("~/mouse-data-server/data")
+DATA_DIR = Path("~/mouse-data-server/data").expanduser()
 TEXTWIDTH = 5.0
 FONTSIZE = 5.0
 COLOR = ["#d11149", "#1a8fe3", "#1ccd6a", "#e6c229", "#6610f2", "#f17105", "#65e5f3", "#bd8ad5", "#b16b57"]

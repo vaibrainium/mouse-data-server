@@ -1,0 +1,22 @@
+-e .
+# external requirements
+black
+isort
+mypy
+nbstripout
+pyyaml
+pathlib2
+pandas
+numpy
+scipy
+scikit-learn
+numba
+statsmodels
+matplotlib
+seaborn
+bokeh
+numpy
+streamlit
+plotly
+pyngrok
+python-dotenv
