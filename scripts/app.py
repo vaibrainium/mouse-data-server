@@ -278,10 +278,10 @@ if start_date and end_date:
                     fig.add_trace(
                         go.Scatter(
                             x=[0, max(session_data["rolling_trials"])],
-                            y=[0.3, 0.3],
+                            y=[0.25, 0.25],
                             mode="lines",
                             line=dict(color="black", dash="dash"),
-                            name="Threshold 0.3",
+                            name="Threshold 0.25",
                         ),
                         row=1,
                         col=3,
@@ -289,10 +289,10 @@ if start_date and end_date:
                     fig.add_trace(
                         go.Scatter(
                             x=[0, max(session_data["rolling_trials"])],
-                            y=[-0.3, -0.3],
+                            y=[-0.25, -0.25],
                             mode="lines",
                             line=dict(color="black", dash="dash"),
-                            name="Threshold -0.3",
+                            name="Threshold -0.25",
                         ),
                         row=1,
                         col=3,
