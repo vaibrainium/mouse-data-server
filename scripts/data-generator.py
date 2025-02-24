@@ -101,21 +101,21 @@ if __name__ == "__main__":
     session_info.date = pd.to_datetime(session_info.date).dt.date
     analyzed_data = {}
 
-    # # try to load old data if exists
-    # try:
-    #     old_session_info = pd.read_csv(Path(PROCESSED_DATA_DIR / "session_info.csv"))
-    #     # if old_session_info is not empty and same as session_info then stop processing
-    #     if not old_session_info.empty:
-    #         # sort both dataframes by date and mouse_id
-    #         old_session_info = old_session_info.sort_values(by=["date", "mouse_id"]).reset_index(drop=True)
-    #         session_info = session_info.sort_values(by=["date", "mouse_id"]).reset_index(drop=True)
-    #         # check if 'mouse_id', 'date', 'session', and 'experiment' are the same in both dataframes
-    #         columns_to_compare = ["mouse_id", "experiment", "session"]
-    #         if session_info[columns_to_compare].equals(old_session_info[columns_to_compare]):
-    #             print("No new data to process.")
-    #             exit()
-    # except FileNotFoundError:
-    #     pass
+    # try to load old data if exists
+    try:
+        old_session_info = pd.read_csv(Path(PROCESSED_DATA_DIR / "session_info.csv"))
+        # if old_session_info is not empty and same as session_info then stop processing
+        if not old_session_info.empty:
+            # sort both dataframes by date and mouse_id
+            old_session_info = old_session_info.sort_values(by=["date", "mouse_id"]).reset_index(drop=True)
+            session_info = session_info.sort_values(by=["date", "mouse_id"]).reset_index(drop=True)
+            # check if 'mouse_id', 'date', 'session', and 'experiment' are the same in both dataframes
+            columns_to_compare = ["mouse_id", "experiment", "session"]
+            if session_info[columns_to_compare].equals(old_session_info[columns_to_compare]):
+                print("No new data to process.")
+                exit()
+    except FileNotFoundError:
+        pass
 
     # Process each mouse and session
     for mouse_id in session_info.mouse_id.unique():
