@@ -285,7 +285,7 @@ if start_date and end_date:
                             x=session_data["all_data_idx"],
                             y=session_data["all_data_choice"] * 0.80,
                             mode="markers",
-                            marker=dict(color="black", symbol="line-ns-open", size=8),
+                            marker=dict(color="black", symbol="line-ns-open", size=8, line=dict(width=1.5)),
                             name="Choices",
                         ),
                         row=1, col=3,
