@@ -121,40 +121,6 @@ def plot_total_valid_vs_start_weight(fig, data):
         col=2,
     )
 
-# def add_correction_blocks(fig, starts, ends, color, name):
-#     for start, end in zip(starts, ends):
-#         fig.add_trace(
-#             go.Scatter(
-#                 x=[start, start, end, end],  # Define rectangle shape
-#                 y=[-1, 1, 1, -1],  # Define vertical fill
-#                 fill="toself",  # Ensure proper fill
-#                 fillcolor=color,
-#                 opacity=0.2,  # Match Matplotlib transparency
-#                 line=dict(width=0),  # Hide borders
-#                 name=name,
-#                 showlegend=False,  # Avoid duplicate legends
-#             ),
-#             row=1, col=3,
-#         )
-
-
-
-def add_correction_blocks(fig, starts, ends, color, name):
-    for idx in range(len(starts)):
-        fig.add_trace(
-            go.Scatter(
-                x=[starts[idx], starts[idx], ends[idx], ends[idx]],  # Define rectangle shape
-                y=[-1, 1, 1, -1],  # Define vertical fill
-                fill="toself",  # Ensure proper fill
-                fillcolor=color,
-                opacity=0.2,  # Match Matplotlib transparency
-                line=dict(width=0),  # Hide borders
-                name=name,
-                showlegend=False,  # Avoid duplicate legends
-            ),
-            row=1, col=3,
-        )
-
 
 def plot_summary_data(data):
     """Plot summary data."""
@@ -227,15 +193,15 @@ if start_date and end_date:
                 # Create subplot for individual session analysis
                 fig = sp.make_subplots(
                     rows=1,
-                    cols=3,
-                    column_widths=[0.25, 0.25, 0.5],
+                    cols=4,
                     subplot_titles=[
                         "Rolling Accuracy",
                         "Accuracy vs Coherence",
-                        "All trials rolling performance"
+                        "Rolling Bias vs Trial Number",
+                        "Reaction Time vs Coherence",
                     ],
                     shared_xaxes=True,
-                    vertical_spacing=0.15,
+                    vertical_spacing=0.1,
                 )
 
                 title = f"Date: {date} <br>"
@@ -282,19 +248,8 @@ if start_date and end_date:
 
                     fig.add_trace(
                         go.Scatter(
-                            x=session_data["all_data_idx"],
-                            y=session_data["all_data_choice"] * 0.80,
-                            mode="markers",
-                            marker=dict(color="black", symbol="line-ns-open", size=8),
-                            name="Choices",
-                        ),
-                        row=1, col=3,
-                    )
-
-                    fig.add_trace(
-                        go.Scatter(
-                            x=session_data["all_data_idx"],
-                            y=session_data["all_data_rolling_bias"],
+                            x=session_data["rolling_trials"],
+                            y=session_data["rolling_bias"],
                             mode="lines",
                             marker=dict(size=12),
                             name=f"Session {idx+1}",
@@ -305,37 +260,48 @@ if start_date and end_date:
                         row=1,
                         col=3,
                     )
-                    for threshold in [0.25, -0.25]:
-                        fig.add_trace(
-                            go.Scatter(
-                                x=[0, max(session_data["all_data_idx"])],
-                                y=[threshold, threshold],
-                                mode="lines",
-                                line=dict(color="black", dash="dash"),
-                                name=f"Threshold {threshold}",
+
+                    fig.add_trace(
+                        go.Scatter(
+                            x=session_data["coherences"],
+                            y=session_data["reaction_time_mean"],
+                            mode="markers",
+                            marker=dict(size=12),
+                            error_y=dict(
+                                type="data",
+                                array=session_data["reaction_time_sd"],
+                                visible=True,
                             ),
-                            row=1, col=3,
-                        )
+                            name=f"Session {idx+1}",
+                            line=dict(color=COLOR[idx]),
+                            hovertemplate="<b>Coherence</b>: %{x}<br><b>Median Reaction Time</b>: %{y}s<extra></extra>",
+                        ),
+                        row=1,
+                        col=4,
+                    )
 
-                    if session_data["right_active_block_starts"]:
-
-                        right_block_color = "rgba(255, 0, 0, 0.5)"  # Red with transparency
-                        left_block_color = "rgba(0, 0, 255, 0.5)"   # Blue with transparency
-                        # Add correction blocks using the function
-                        add_correction_blocks(fig, session_data["right_active_block_starts"], session_data["right_active_block_ends"], right_block_color, "Right Active Block")
-                        add_correction_blocks(fig, session_data["left_active_block_starts"], session_data["left_active_block_ends"], left_block_color, "Left Active Block")
-
-                        # Legend traces (dummy scatter points for better legend formatting)
-                        for color, name in zip([right_block_color, left_block_color], ["Right Active Block", "Left Active Block"]):
-                            fig.add_trace(
-                                go.Scatter(
-                                    x=[None], y=[None],
-                                    mode="markers",
-                                    marker=dict(size=10, color=color),
-                                    name=name,
-                                ),
-                                row=1, col=3,
-                            )
+                fig.add_trace(
+                    go.Scatter(
+                        x=[0, max(session_data["rolling_trials"])],
+                        y=[0.25, 0.25],
+                        mode="lines",
+                        line=dict(color="black", dash="dash"),
+                        name="Threshold 0.25",
+                    ),
+                    row=1,
+                    col=3,
+                )
+                fig.add_trace(
+                    go.Scatter(
+                        x=[0, max(session_data["rolling_trials"])],
+                        y=[-0.25, -0.25],
+                        mode="lines",
+                        line=dict(color="black", dash="dash"),
+                        name="Threshold -0.25",
+                    ),
+                    row=1,
+                    col=3,
+                )
 
                 fig.update_layout(
                     title=title,
@@ -350,15 +316,18 @@ if start_date and end_date:
                     yaxis=dict(title="Rolling Accuracy (%)", range=[-10, 105], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True),
                     yaxis2=dict(title="Accuracy (%)", range=[0, 105], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True),
                     yaxis3=dict(title="Rolling Bias", range=[-1.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True),
+                    yaxis4=dict(title="Reaction Time (s)", range=[0, 5], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True),
 
                     xaxis=dict(title="Trial Number", range=[0, len(session_data['binned_trials'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True),
                     xaxis2=dict(title="% Coherence"),
-                    xaxis3=dict(title="Trial Number", range=[0, len(session_data['all_data_idx'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True),
+                    xaxis3=dict(title="Trial Number", range=[0, len(session_data['rolling_trials'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True),
+                    xaxis4=dict(title="% Coherence"),
 
                     annotations=[
                         dict(text="Binned Session Accuracy", x=0.125, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
                         dict(text="Accuracy vs Coherence", x=0.375, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
-                        dict(text="Rolling Bias vs Trial Number", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"), ),
+                        dict(text="Rolling Bias vs Trial Number", x=0.625, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"), ),
+                        dict(text="Reaction Time vs Coherence", x=0.875, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
                     ]
                 )
 

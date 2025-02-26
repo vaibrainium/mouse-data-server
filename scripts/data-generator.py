@@ -75,11 +75,13 @@ def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=Non
 
 
 def preprocess_data(data):
-    data = data.dropna(subset=["outcome"])
-    data = data[data.is_correction_trial == False]
-    if "in_active_bias_correction_block" in data.columns:
-        data = data[data.in_active_bias_correction_block == False]
-    return data
+    all_data =data[data["choice"].isin([-1, 1])].reset_index(drop=True)
+
+    valid_data = data.dropna(subset=["outcome"])
+    valid_data = valid_data[valid_data.is_correction_trial == False]
+    if "in_active_bias_correction_block" in valid_data.columns:
+        valid_data = valid_data[valid_data.in_active_bias_correction_block == False]
+    return valid_data, all_data
 
 def get_binned_accuracy(data, bin_size=20):
     outcome_array = data["outcome"].astype(float).to_numpy()
@@ -88,12 +90,65 @@ def get_binned_accuracy(data, bin_size=20):
     binned_indices = np.arange(num_bins) * bin_size
     return binned_indices, np.array(binned_accuracy)
 
-def get_binned_accuracy(data, bin_size=20):
-    outcome_array = data["outcome"].astype(float).to_numpy()
-    num_bins = len(outcome_array) // bin_size
-    binned_accuracy = [np.nanmean(outcome_array[i * bin_size : (i + 1) * bin_size]) * 100 for i in range(num_bins)]
-    binned_indices = np.arange(num_bins) * bin_size
-    return binned_indices, np.array(binned_accuracy)
+def get_active_block_vars(data):
+    if "in_active_bias_correction_block" not in data.columns:
+        return data.index, None, None, None, None
+
+    active_block_starts = np.where(data["in_active_bias_correction_block"].astype(int).diff().gt(0))[0]
+    active_block_ends = np.where(data["in_active_bias_correction_block"].astype(int).diff().lt(0))[0]
+
+    # Handle edge cases: If block starts but has no corresponding end
+    if len(active_block_ends) < len(active_block_starts):
+        active_block_ends = np.append(active_block_ends, len(data) - 1)  # Assume last index is end
+    # Ensure equal start-end pairing
+    active_block_starts = active_block_starts[:len(active_block_ends)]
+
+    # Initialize right/left block lists
+    right_block_starts, right_block_ends = [], []
+    left_block_starts, left_block_ends = [], []
+
+    for idx in range(len(active_block_starts)):
+        start, end = active_block_starts[idx], active_block_ends[idx]
+
+        # Ensure the end index is valid
+        if start >= len(data) or end >= len(data):
+            continue  # Skip invalid indices
+
+        # Compute mean signed coherence
+        mean_signed_coh = np.nanmean(data["signed_coherence"].iloc[start:end+1])
+
+        # Classify the block based on sign
+        if mean_signed_coh > 0:
+            right_block_starts.append(start)
+            right_block_ends.append(end)
+        else:
+            left_block_starts.append(start)
+            left_block_ends.append(end)
+
+    return data.index, right_block_starts, right_block_ends, left_block_starts, left_block_ends
+
+
+def get_all_rolling_bias(all_data, window=20):
+    rolling_bias = np.zeros(window)
+    rolling_bias_idx = 0
+    accumulated_rolling_bias = []
+
+    is_active_correction_present = "in_active_bias_correction_block" in all_data.columns
+
+    for trial in all_data.itertuples():
+        if is_active_correction_present and trial.in_active_bias_correction_block:
+            # Reset rolling bias during active correction
+            rolling_bias.fill(0)
+            rolling_bias_idx = 0
+        elif not trial.is_correction_trial and trial.outcome is not None:
+            # Update rolling bias for valid trials
+            rolling_bias[rolling_bias_idx] = trial.choice
+            rolling_bias_idx = (rolling_bias_idx + 1) % window
+
+        # Store current rolling mean
+        accumulated_rolling_bias.append(np.mean(rolling_bias))
+    return accumulated_rolling_bias
+
 
 if __name__ == "__main__":
     # Get session information for recent sessions
@@ -126,7 +181,8 @@ if __name__ == "__main__":
                 trial_info = pd.read_csv(
                     SHARED_DATA_DIR / mouse_id / "data/random_dot_motion" / metadata.experiment / metadata.session / f"{mouse_id}_trial.csv"
                 )
-                trial_info = preprocess_data(trial_info)
+                trial_info, all_trial_info = preprocess_data(trial_info)
+
 
                 condition = (session_info.mouse_id == mouse_id) & (session_info.date == date) & (session_info.session == metadata.session)
 
@@ -137,9 +193,10 @@ if __name__ == "__main__":
                     np.sum(trial_info.trial_reward).astype(int),
                 ]
 
-                binned_trial, binned_accuracy = get_binned_accuracy(trial_info, bin_size=20)
                 coherences, accuracies = pmf_utils.get_accuracy_data(trial_info)
                 _, reaction_time_median, reaction_time_mean, reaction_time_sd = pmf_utils.get_chronometric_data(trial_info)
+                all_trial_idx, right_active_block_starts, right_active_block_ends, left_active_block_starts, left_active_block_ends = get_active_block_vars(all_trial_info)
+                all_data_rolling_bias = get_all_rolling_bias(all_trial_info, window=20)
 
                 analyzed_data[metadata["index"]] = {
                     "binned_trials": trial_info.idx_valid,
@@ -151,6 +208,14 @@ if __name__ == "__main__":
                     "reaction_time_mean": reaction_time_mean,
                     "reaction_time_median": reaction_time_median,
                     "reaction_time_sd": reaction_time_sd,
+                    # all trials rolling bias plot
+                    "all_data_idx": all_trial_idx,
+                    "all_data_rolling_bias": all_data_rolling_bias,
+                    "all_data_choice": all_trial_info.choice,
+                    "right_active_block_starts": right_active_block_starts,
+                    "right_active_block_ends": right_active_block_ends,
+                    "left_active_block_starts": left_active_block_starts,
+                    "left_active_block_ends": left_active_block_ends,
                 }
 
     # Save the updated DataFrame to a new CSV file
