@@ -7,6 +7,10 @@ import pandas as pd
 import dotenv
 import os
 
+import scipy.optimize as opt
+from scipy.stats import norm
+from scipy.special import expit  # Sigmoid function
+
 from utils import pmf_utils
 dotenv.load_dotenv()
 
@@ -90,6 +94,7 @@ def get_binned_accuracy(data, bin_size=20):
     binned_indices = np.arange(num_bins) * bin_size
     return binned_indices, np.array(binned_accuracy)
 
+
 def get_active_block_vars(data):
     if "in_active_bias_correction_block" not in data.columns:
         return data.index, None, None, None, None
@@ -114,8 +119,45 @@ def get_active_block_vars(data):
         if start >= len(data) or end >= len(data):
             continue  # Skip invalid indices
 
-        # Compute mean signed coherence
-        mean_signed_coh = np.nanmean(data["signed_coherence"].iloc[start:end+1])
+        # Compute mean signed coherence in the block but only for trials where outcome is correct
+        mean_signed_coh = np.nanmean(data["signed_coherence"].iloc[start:end+1][data["outcome"].iloc[start:end+1] == 1])
+
+        # Classify the block based on sign
+        if mean_signed_coh > 0:
+            right_block_starts.append(start)
+            right_block_ends.append(end)
+        else:
+            left_block_starts.append(start)
+            left_block_ends.append(end)
+
+    return data.index, right_block_starts, right_block_ends, left_block_starts, left_block_ends
+
+def get_active_block_vars(data):
+    if "in_active_bias_correction_block" not in data.columns:
+        return data.index, None, None, None, None
+
+    active_block_starts = np.where(data["in_active_bias_correction_block"].astype(int).diff().gt(0))[0]
+    active_block_ends = np.where(data["in_active_bias_correction_block"].astype(int).diff().lt(0))[0]
+
+    # Handle edge cases: If block starts but has no corresponding end
+    if len(active_block_ends) < len(active_block_starts):
+        active_block_ends = np.append(active_block_ends, len(data) - 1)  # Assume last index is end
+    # Ensure equal start-end pairing
+    active_block_starts = active_block_starts[:len(active_block_ends)]
+
+    # Initialize right/left block lists
+    right_block_starts, right_block_ends = [], []
+    left_block_starts, left_block_ends = [], []
+
+    for idx in range(len(active_block_starts)):
+        start, end = active_block_starts[idx], active_block_ends[idx]
+
+        # Ensure the end index is valid
+        if start >= len(data) or end >= len(data):
+            continue  # Skip invalid indices
+
+        # Compute mean signed coherence in the block but only for trials where outcome is correct
+        mean_signed_coh = np.nanmean(data["signed_coherence"].iloc[start:end+1][data["outcome"].iloc[start:end+1] == 1])
 
         # Classify the block based on sign
         if mean_signed_coh > 0:
@@ -148,6 +190,24 @@ def get_all_rolling_bias(all_data, window=20):
         # Store current rolling mean
         accumulated_rolling_bias.append(np.mean(rolling_bias))
     return accumulated_rolling_bias
+
+
+# 📌 Fit a psychometric function for choices
+def logistic(x, bias, sensitivity):
+    return expit(sensitivity * (x - bias))
+
+def fit_psychometric(x, y):
+    def loss(params):
+        return -np.sum(y * np.log(logistic(x, *params)) + (1 - y) * np.log(1 - logistic(x, *params)))
+
+    result = opt.minimize(loss, [0, 0.1])  # Initial guess: bias=0, sensitivity=0.1
+    return result.x  # Returns bias and sensitivity
+
+def get_sensory_noise(data):
+    coherence,  choices = pmf_utils.get_psychometric_data(data, fit=False)
+    bias_mouse, sensitivity_mouse = fit_psychometric(coherence, choices)
+    sensory_noise_mouse = 1 / sensitivity_mouse  # Estimate noise level
+    return sensory_noise_mouse
 
 
 if __name__ == "__main__":
@@ -186,11 +246,13 @@ if __name__ == "__main__":
 
                 condition = (session_info.mouse_id == mouse_id) & (session_info.date == date) & (session_info.session == metadata.session)
 
-                session_info.loc[condition, ["total_attempts", "total_valid", "session_accuracy", "total_reward"]] = [
+
+                session_info.loc[condition, ["total_attempts", "total_valid", "session_accuracy", "total_reward", "sensory_noise"]] = [
                     max(trial_info.idx_attempt),
                     max(trial_info.idx_valid),
                     np.nanmean(trial_info.outcome) * 100,
                     np.sum(trial_info.trial_reward).astype(int),
+                    get_sensory_noise(all_trial_info),
                 ]
 
                 coherences, accuracies = pmf_utils.get_accuracy_data(trial_info)

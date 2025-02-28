@@ -182,34 +182,74 @@ def fit_psychometric_function(x_data, y_data, **model_kwargs):
     return model
 
 
-def get_chronometric_data(data, positive_direction="right"):
-    coherences = np.asarray([])
-    reaction_time_median = np.asarray([])
-    reaction_time_mean = np.asarray([])
-    reaction_time_sd = np.asarray([])
-    for _, coh in enumerate(np.unique(data["signed_coherence"])):
+def get_psychometric_data(data, positive_direction="right", fit=True):
+    x_data, y_data = [], []
+
+    for coh in np.unique(data["signed_coherence"]):
+        mask = data["signed_coherence"] == coh
+        total_trials = np.sum(mask)
+
+        if total_trials == 0:  # Avoid division by zero
+            continue
+
         if positive_direction == "right":
-            coherences = np.append(coherences, coh)
-            reaction_time_median = np.append(
-                reaction_time_median, np.median(data["response_time"][(data["signed_coherence"] == coh) & (data["outcome"] == 1)])
-            )
-            reaction_time_mean = np.append(
-                reaction_time_mean, np.mean(data["response_time"][(data["signed_coherence"] == coh) & (data["outcome"] == 1)])
-            )
-            reaction_time_sd = np.append(reaction_time_sd, np.std(data["response_time"][(data["signed_coherence"] == coh) & (data["outcome"] == 1)]))
-        elif positive_direction == "letf":
-            coherences = np.append(coherences, -coh)
-            reaction_time_median = np.append(
-                reaction_time_median, np.median(data["response_time"][(data["signed_coherence"] == coh) & (data["outcome"] == 1)])
-            )
-            reaction_time_mean = np.append(
-                reaction_time_mean, np.mean(data["response_time"][(data["signed_coherence"] == coh) & (data["outcome"] == 1)])
-            )
-            reaction_time_sd = np.append(reaction_time_sd, np.std(data["response_time"][(data["signed_coherence"] == coh) & (data["outcome"] == 1)]))
-    # sort coherences and chrono by coherence
-    coherences, reaction_time_median, reaction_time_mean, reaction_time_sd = zip(
-        *sorted(zip(coherences, reaction_time_median, reaction_time_mean, reaction_time_sd))
-    )
+            proportion_positive = np.sum(data["choice"][mask] == 1) / total_trials
+            x_data.append(coh)
+        elif positive_direction == "left":
+            proportion_positive = np.sum(data["choice"][mask] == 0) / total_trials
+            x_data.append(-coh)  # Flip sign for leftward motion
+
+        y_data.append(proportion_positive)
+
+    # Sort data
+    x_data, y_data = zip(*sorted(zip(x_data, y_data)))
+    x_data, y_data = np.array(x_data), np.array(y_data)
+
+    if not fit:
+        return x_data, y_data
+
+    # fit psychometric function
+    x_model = np.linspace(min(x_data), max(x_data), 100)
+    model = fit_psychometric_function(x_data, y_data)
+    y_model = model.predict(x_model)
+    return  x_data, y_data, model, np.asarray(x_model), np.asarray(y_model)
+
+
+def fit_psychometric_function(x_data, y_data, **model_kwargs):
+    defaults = {"model": "logit_4", "var_lims": (1e-5, 10), "lapse_rate_lims": (1e-5, 0.2), "guess_rate_lims": (1e-5, 0.2)}
+    for k, v in defaults.items():
+        val = model_kwargs.get(k, v)
+        model_kwargs[k] = val
+    model = PsychometricFunction(**model_kwargs).fit(x_data, y_data)
+    return model
+
+
+def get_chronometric_data(data, positive_direction="right"):
+    coherences = []
+    reaction_time_median = []
+    reaction_time_mean = []
+    reaction_time_sd = []
+
+    for coh in np.unique(data["signed_coherence"]):
+        subset = data[(data["signed_coherence"] == coh) & (data["outcome"] == 1)]  # Correct trials
+
+        if subset["response_time"].empty:
+            continue  # Skip coherence levels with no correct trials
+
+        if positive_direction == "right":
+            coherences.append(coh)
+        elif positive_direction == "left":
+            coherences.append(-coh)  # Flip sign for leftward motion
+
+        # Compute reaction time statistics
+        reaction_time_median.append(np.median(subset["response_time"]))
+        reaction_time_mean.append(np.mean(subset["response_time"]))
+        reaction_time_sd.append(np.std(subset["response_time"]))
+
+    # Convert to numpy arrays and sort
+    sorted_data = sorted(zip(coherences, reaction_time_median, reaction_time_mean, reaction_time_sd))
+    coherences, reaction_time_median, reaction_time_mean, reaction_time_sd = map(np.array, zip(*sorted_data))
+
     return coherences, reaction_time_median, reaction_time_mean, reaction_time_sd
 
 
@@ -224,6 +264,6 @@ def get_accuracy_data(data, positive_direction="right"):
             coherences = np.append(coherences, -coh)
             accuracy = np.append(accuracy, np.sum(data["outcome"][data["signed_coherence"] == coh] == 1) / np.sum(data["signed_coherence"] == coh))
 
-    # sort coherences and chrono by coherence
-    coherences, accuracy = zip(*sorted(zip(coherences, accuracy)))
-    return np.array(coherences), np.array(accuracy)
+    sorted_data = sorted(zip(coherences, accuracy))
+    coherences, accuracy = map(np.array, zip(*sorted_data))
+    return coherences, accuracy
