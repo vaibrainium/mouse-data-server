@@ -1,5 +1,5 @@
 class pmf_utils:
-    from .PMF_utils import fit_psychometric_function, get_accuracy_data, get_chronometric_data, get_psychometric_data
+    from .pmf_utils import fit_psychometric_function, get_accuracy_data, get_chronometric_data, get_psychometric_data
 
 
 # Create a limited interface for glm_hmm_utils
