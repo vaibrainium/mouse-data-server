@@ -243,9 +243,13 @@ if __name__ == "__main__":
                 )
                 trial_info, all_trial_info = preprocess_data(trial_info)
 
-
                 condition = (session_info.mouse_id == mouse_id) & (session_info.date == date) & (session_info.session == metadata.session)
 
+                # Skip sessions with less than 100 attempted trials
+                if all_trial_info.shape[0] < 50:
+                    # drop the row from session_info
+                    session_info = session_info.drop(session_info[condition].index)
+                    continue
 
                 session_info.loc[condition, ["total_attempts", "total_valid", "session_accuracy", "total_reward", "sensory_noise"]] = [
                     max(trial_info.idx_attempt),
