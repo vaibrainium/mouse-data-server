@@ -42,7 +42,7 @@ def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=Non
     end_date_str = end_date.strftime(date_format)
 
     session_data = []
-    required_columns = ["date", "start_weight", "end_weight", "baseline_weight", "experiment", "session"]
+    required_columns = ["date", "start_weight", "end_weight", "baseline_weight", "experiment", "session", "session_uuid"]
 
     for mouse in mouse_ids:
         history_path = mouse / "history.csv"
@@ -72,11 +72,10 @@ def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=Non
         history["end_weight"] = history["end_weight"] / history["baseline_weight"] * 100
         history["mouse_id"] = mouse.name
 
-        session_data.append(history[["mouse_id", "date", "start_weight", "end_weight", "experiment", "session"]])
+        session_data.append(history[["mouse_id", "date", "start_weight", "end_weight", "experiment", "session", "session_uuid"]])
 
     # Concatenate all results into a single DataFrame
     return pd.concat(session_data, ignore_index=True) if session_data else pd.DataFrame()
-
 
 def preprocess_data(data):
     all_data =data[data["choice"].isin([-1, 1])].reset_index(drop=True)
@@ -94,7 +93,6 @@ def get_binned_accuracy(data, bin_size=20):
     binned_indices = np.arange(num_bins) * bin_size
     return binned_indices, np.array(binned_accuracy)
 
-
 def get_active_block_vars(data):
     if "in_active_bias_correction_block" not in data.columns:
         return data.index, None, None, None, None
@@ -168,7 +166,6 @@ def get_active_block_vars(data):
             left_block_ends.append(end)
 
     return data.index, right_block_starts, right_block_ends, left_block_starts, left_block_ends
-
 
 def get_all_rolling_bias(all_data, window=20):
     rolling_bias = np.zeros(window)
@@ -191,12 +188,11 @@ def get_all_rolling_bias(all_data, window=20):
         accumulated_rolling_bias.append(np.mean(rolling_bias))
     return accumulated_rolling_bias
 
-
-# 📌 Fit a psychometric function for choices
 def logistic(x, bias, sensitivity):
     return expit(sensitivity * (x - bias))
 
 def fit_psychometric(x, y):
+    # 📌 Fit a psychometric function for choices
     def loss(params):
         return -np.sum(y * np.log(logistic(x, *params)) + (1 - y) * np.log(1 - logistic(x, *params)))
 
@@ -209,7 +205,6 @@ def get_sensory_noise(data):
     sensory_noise_mouse = 1 / sensitivity_mouse  # Estimate noise level
     return sensory_noise_mouse
 
-
 if __name__ == "__main__":
     # Get session information for recent sessions
     session_info = get_recent_sessions(last_X_business_days=30)
@@ -221,12 +216,8 @@ if __name__ == "__main__":
         old_session_info = pd.read_csv(Path(PROCESSED_DATA_DIR / "session_info.csv"))
         # if old_session_info is not empty and same as session_info then stop processing
         if not old_session_info.empty:
-            # sort both dataframes by date and mouse_id
-            old_session_info = old_session_info.sort_values(by=["date", "mouse_id"]).reset_index(drop=True)
-            session_info = session_info.sort_values(by=["date", "mouse_id"]).reset_index(drop=True)
-            # check if 'mouse_id', 'date', 'session', and 'experiment' are the same in both dataframes
-            columns_to_compare = ["mouse_id", "experiment", "session"]
-            if session_info[columns_to_compare].equals(old_session_info[columns_to_compare]):
+            newly_added_sessions = set(old_session_info.session_uuid) - set(session_info.session_uuid)
+            if not newly_added_sessions:
                 print("No new data to process.")
                 exit()
     except FileNotFoundError:
@@ -264,7 +255,7 @@ if __name__ == "__main__":
                 all_trial_idx, right_active_block_starts, right_active_block_ends, left_active_block_starts, left_active_block_ends = get_active_block_vars(all_trial_info)
                 all_data_rolling_bias = get_all_rolling_bias(all_trial_info, window=20)
 
-                analyzed_data[metadata["index"]] = {
+                analyzed_data[metadata.session_uuid] = {
                     "binned_trials": trial_info.idx_valid,
                     "binned_accuracies": np.array((100 * trial_info.outcome.rolling(window=20).mean())),
                     "rolling_trials": trial_info.idx_valid,

@@ -321,7 +321,7 @@ if __name__ == "__main__":
                     for idx, metadata in sessions.iterrows():
                         if metadata.total_valid < 10:
                             continue
-                        session_data = analyzed_data[metadata["index"]]
+                        session_data = analyzed_data[metadata.session_uuid]
                         start_weights.append(int(metadata.start_weight))
                         experiments.append(metadata.experiment.replace("_", " ").title())
 
