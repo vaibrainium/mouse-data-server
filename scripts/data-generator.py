@@ -16,65 +16,53 @@ dotenv.load_dotenv()
 
 SHARED_DATA_DIR = Path(os.getenv("SHARED_DATA_DIR"))
 PROCESSED_DATA_DIR = Path(os.getenv("PROCESSED_DATA_DIR"))
+if not SHARED_DATA_DIR or not PROCESSED_DATA_DIR:
+    raise ValueError("Environment variables SHARED_DATA_DIR and PROCESSED_DATA_DIR must be set.")
 
+def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=None) -> pd.DataFrame:
+    """
+    Get session information for recent sessions based on the specified date range or last X business days.
 
-def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=None):
+    Parameters
+    ----------
+    last_X_business_days : int, optional
+    start_date : str, optional
+    end_date : str, optional
 
+    Returns
+    -------
+    pd.DataFrame
+    """
     # Get all mouse ID folders except "XXX"
-    mouse_ids = [f for f in SHARED_DATA_DIR.iterdir() if f.is_dir() and f.name != "XXX"]
+    mouse_ids: list[Path] = [f for f in SHARED_DATA_DIR.iterdir() if f.is_dir() and f.name != "XXX"]
+    today: pd.Timestamp = pd.to_datetime("today")  # Keep full timestamp
 
-    # Determine date range
-    today = pd.to_datetime("today")  # Keep full timestamp
-    if last_X_business_days is not None:
-        start_date = today - pd.offsets.BDay(last_X_business_days)
-        end_date = today
+    if last_X_business_days:
+        start_date, end_date = today - pd.offsets.BDay(last_X_business_days), today
     else:
-        start_date = pd.to_datetime(start_date, errors="coerce")
-        end_date = pd.to_datetime(end_date, errors="coerce") if end_date else today
-
-    # Validate date range
-    if pd.isna(start_date) or pd.isna(end_date):
-        raise ValueError("Invalid start_date or end_date format.")
-
-    # Convert start_date and end_date to a consistent format
-    date_format = "%Y-%m-%d"
-    start_date_str = start_date.strftime(date_format)
-    end_date_str = end_date.strftime(date_format)
+        start_date, end_date = map(pd.to_datetime, (start_date, end_date or today))
+        if pd.isna(start_date) or pd.isna(end_date) or start_date > end_date:
+            raise ValueError("Invalid start_date or end_date format.")
 
     session_data = []
-    required_columns = ["date", "start_weight", "end_weight", "baseline_weight", "experiment", "session", "session_uuid"]
+    required_cols = ["date", "start_weight", "end_weight", "baseline_weight", "experiment", "session", "session_uuid"]
 
     for mouse in mouse_ids:
         history_path = mouse / "history.csv"
-
-        try:
-            history = pd.read_csv(history_path)
-        except FileNotFoundError:
+        if not history_path.exists():
             continue
 
-        # Convert date column dynamically to handle mixed formats
-        history["date"] = pd.to_datetime(history["date"], format="mixed", errors="coerce")
-        history = history.dropna(subset=["date"])  # Drop rows with invalid dates
-
-        # Reformat history["date"] to match start_date and end_date format
-        history["date"] = history["date"].dt.strftime(date_format)
-        history["date"] = pd.to_datetime(history["date"], format=date_format, errors="coerce")  # Convert back to datetime
-
-        # Apply date filtering
+        history = pd.read_csv(history_path, parse_dates=["date"], dayfirst=True).dropna(subset=["date"])
+        history["date"] = pd.to_datetime(history["date"], format='mixed', errors="coerce")
         history = history[(history["date"] >= start_date) & (history["date"] <= end_date)]
-
         if history.empty:
             continue
 
-        # Ensure required columns exist
-        history = history.reindex(columns=required_columns, fill_value=pd.NA)
-        history["start_weight"] = history["start_weight"] / history["baseline_weight"] * 100
-        history["end_weight"] = history["end_weight"] / history["baseline_weight"] * 100
-        history["mouse_id"] = mouse.name
+        history = history.reindex(columns=required_cols, fill_value=pd.NA)
+        history[["start_weight", "end_weight"]] = history[["start_weight", "end_weight"]].div(history["baseline_weight"], axis=0) * 100
+        history.insert(0, "mouse_id", mouse.name)
+        session_data.append(history)
 
-        session_data.append(history[["mouse_id", "date", "start_weight", "end_weight", "experiment", "session", "session_uuid"]])
-
-    # Concatenate all results into a single DataFrame
     return pd.concat(session_data, ignore_index=True) if session_data else pd.DataFrame()
 
 def preprocess_data(data):
@@ -97,96 +85,34 @@ def get_active_block_vars(data):
     if "in_active_bias_correction_block" not in data.columns:
         return data.index, None, None, None, None
 
-    active_block_starts = np.where(data["in_active_bias_correction_block"].astype(int).diff().gt(0))[0]
-    active_block_ends = np.where(data["in_active_bias_correction_block"].astype(int).diff().lt(0))[0]
+    active_blocks = data["in_active_bias_correction_block"].astype(int).diff()
+    starts, ends = np.where(active_blocks > 0)[0], np.where(active_blocks < 0)[0]
+    if len(ends) < len(starts):
+        ends = np.append(ends, len(data) - 1)
 
-    # Handle edge cases: If block starts but has no corresponding end
-    if len(active_block_ends) < len(active_block_starts):
-        active_block_ends = np.append(active_block_ends, len(data) - 1)  # Assume last index is end
-    # Ensure equal start-end pairing
-    active_block_starts = active_block_starts[:len(active_block_ends)]
+    left_starts, left_ends, right_starts, right_ends = [], [], [], []
+    for s, e in zip(starts, ends):
+        if s >= len(data) or e >= len(data):
+            continue
+        mean_signed_coh = np.nanmean(data.loc[s:e, "signed_coherence"][data.loc[s:e, "outcome"] == 1])
+        (right_starts if mean_signed_coh > 0 else left_starts).append(s)
+        (right_ends if mean_signed_coh > 0 else left_ends).append(e)
 
-    # Initialize right/left block lists
-    right_block_starts, right_block_ends = [], []
-    left_block_starts, left_block_ends = [], []
+    return data.index, right_starts, right_ends, left_starts, left_ends
 
-    for idx in range(len(active_block_starts)):
-        start, end = active_block_starts[idx], active_block_ends[idx]
-
-        # Ensure the end index is valid
-        if start >= len(data) or end >= len(data):
-            continue  # Skip invalid indices
-
-        # Compute mean signed coherence in the block but only for trials where outcome is correct
-        mean_signed_coh = np.nanmean(data["signed_coherence"].iloc[start:end+1][data["outcome"].iloc[start:end+1] == 1])
-
-        # Classify the block based on sign
-        if mean_signed_coh > 0:
-            right_block_starts.append(start)
-            right_block_ends.append(end)
-        else:
-            left_block_starts.append(start)
-            left_block_ends.append(end)
-
-    return data.index, right_block_starts, right_block_ends, left_block_starts, left_block_ends
-
-def get_active_block_vars(data):
-    if "in_active_bias_correction_block" not in data.columns:
-        return data.index, None, None, None, None
-
-    active_block_starts = np.where(data["in_active_bias_correction_block"].astype(int).diff().gt(0))[0]
-    active_block_ends = np.where(data["in_active_bias_correction_block"].astype(int).diff().lt(0))[0]
-
-    # Handle edge cases: If block starts but has no corresponding end
-    if len(active_block_ends) < len(active_block_starts):
-        active_block_ends = np.append(active_block_ends, len(data) - 1)  # Assume last index is end
-    # Ensure equal start-end pairing
-    active_block_starts = active_block_starts[:len(active_block_ends)]
-
-    # Initialize right/left block lists
-    right_block_starts, right_block_ends = [], []
-    left_block_starts, left_block_ends = [], []
-
-    for idx in range(len(active_block_starts)):
-        start, end = active_block_starts[idx], active_block_ends[idx]
-
-        # Ensure the end index is valid
-        if start >= len(data) or end >= len(data):
-            continue  # Skip invalid indices
-
-        # Compute mean signed coherence in the block but only for trials where outcome is correct
-        mean_signed_coh = np.nanmean(data["signed_coherence"].iloc[start:end+1][data["outcome"].iloc[start:end+1] == 1])
-
-        # Classify the block based on sign
-        if mean_signed_coh > 0:
-            right_block_starts.append(start)
-            right_block_ends.append(end)
-        else:
-            left_block_starts.append(start)
-            left_block_ends.append(end)
-
-    return data.index, right_block_starts, right_block_ends, left_block_starts, left_block_ends
-
-def get_all_rolling_bias(all_data, window=20):
+def get_all_rolling_bias(data, window=20):
     rolling_bias = np.zeros(window)
-    rolling_bias_idx = 0
-    accumulated_rolling_bias = []
+    accumulated_bias, idx = [], 0
 
-    is_active_correction_present = "in_active_bias_correction_block" in all_data.columns
-
-    for trial in all_data.itertuples():
-        if is_active_correction_present and trial.in_active_bias_correction_block:
-            # Reset rolling bias during active correction
+    for trial in data.itertuples():
+        if getattr(trial, "in_active_bias_correction_block", False):
             rolling_bias.fill(0)
-            rolling_bias_idx = 0
         elif not trial.is_correction_trial and trial.outcome is not None:
-            # Update rolling bias for valid trials
-            rolling_bias[rolling_bias_idx] = trial.choice
-            rolling_bias_idx = (rolling_bias_idx + 1) % window
+            rolling_bias[idx] = trial.choice
+            idx = (idx + 1) % window
+        accumulated_bias.append(np.mean(rolling_bias))
 
-        # Store current rolling mean
-        accumulated_rolling_bias.append(np.mean(rolling_bias))
-    return accumulated_rolling_bias
+    return accumulated_bias
 
 def logistic(x, bias, sensitivity):
     return expit(sensitivity * (x - bias))
@@ -201,31 +127,90 @@ def fit_psychometric(x, y):
 
 def get_sensory_noise(data):
     coherence,  choices = pmf_utils.get_psychometric_data(data, fit=False)
-    bias_mouse, sensitivity_mouse = fit_psychometric(coherence, choices)
-    sensory_noise_mouse = 1 / sensitivity_mouse  # Estimate noise level
-    return sensory_noise_mouse
+    bias, sensitivity = fit_psychometric(coherence, choices)
+    sensory_noise = 1 / sensitivity  # Estimate noise level
+    return sensory_noise
+
+def load_existing_data():
+    """Load existing session and analyzed data if available."""
+    old_session_file = Path(PROCESSED_DATA_DIR / "session_info.csv")
+    old_analyzed_file = Path(PROCESSED_DATA_DIR / "analyzed_data.pkl")
+
+    # Check if both session info and analyzed data exist
+    if old_session_file.exists() and old_analyzed_file.exists():
+        old_session_info = pd.read_csv(old_session_file)
+        with open(old_analyzed_file, "rb") as f:
+            old_analyzed_data = pickle.load(f)
+    else:
+        old_session_info = pd.DataFrame()  # No previous data
+        old_analyzed_data = {}
+
+    return old_session_info, old_analyzed_data
+
+def update_sessions(old_session_info, old_analyzed_data, session_info):
+    """Remove outdated sessions from the old session info."""
+    sessions_to_remove = old_session_info[~old_session_info["session_uuid"].isin(session_info["session_uuid"])]["session_uuid"].tolist()
+    sessions_to_add = session_info[~session_info["session_uuid"].isin(old_session_info["session_uuid"])]
+
+    if sessions_to_remove:
+        updated_session_info = session_info[~session_info["session_uuid"].isin(sessions_to_remove)].reset_index(drop=True)
+        for key in sessions_to_remove:
+            old_analyzed_data.pop(key, None)
+        updated_analyzed_data = old_analyzed_data
+    else:
+        updated_session_info = session_info
+        updated_analyzed_data = old_analyzed_data
+    return updated_session_info, updated_analyzed_data, sessions_to_add
+
+def process_analyzed_data(all_trial_info, valid_trial_info):
+    coherences, accuracies = pmf_utils.get_accuracy_data(valid_trial_info)
+    _, reaction_time_median, reaction_time_mean, reaction_time_sd = pmf_utils.get_chronometric_data(valid_trial_info)
+    all_trial_idx, right_active_block_starts, right_active_block_ends, left_active_block_starts, left_active_block_ends = get_active_block_vars(all_trial_info)
+    all_data_rolling_bias = get_all_rolling_bias(all_trial_info, window=20)
+
+    return {
+        "binned_trials": valid_trial_info.idx_valid,
+        "binned_accuracies": np.array((100 * valid_trial_info.outcome.rolling(window=20).mean())),
+        "rolling_trials": valid_trial_info.idx_valid,
+        "rolling_bias": np.array(valid_trial_info.choice.rolling(window=20).mean()),
+        "coherences": coherences,
+        "accuracy": accuracies,
+        "reaction_time_mean": reaction_time_mean,
+        "reaction_time_median": reaction_time_median,
+        "reaction_time_sd": reaction_time_sd,
+        # all trials rolling bias plot
+        "all_data_idx": all_trial_idx,
+        "all_data_rolling_bias": all_data_rolling_bias,
+        "all_data_choice": all_trial_info.choice,
+        "right_active_block_starts": right_active_block_starts,
+        "right_active_block_ends": right_active_block_ends,
+        "left_active_block_starts": left_active_block_starts,
+        "left_active_block_ends": left_active_block_ends,
+    }
 
 if __name__ == "__main__":
-    # Get session information for recent sessions
+    # ✅ Load existing session data if available
+    old_session_info, old_analyzed_data = load_existing_data()
+
     session_info = get_recent_sessions(last_X_business_days=30)
     session_info.date = pd.to_datetime(session_info.date).dt.date
-    analyzed_data = {}
+    if session_info.empty:
+        print("No session data found. Exiting.")
+        exit()
 
-    # try to load old data if exists
-    try:
-        old_session_info = pd.read_csv(Path(PROCESSED_DATA_DIR / "session_info.csv"))
-        # if old_session_info is not empty and same as session_info then stop processing
-        if not old_session_info.empty:
-            newly_added_sessions = set(old_session_info.session_uuid) - set(session_info.session_uuid)
-            if not newly_added_sessions:
-                print("No new data to process.")
-                exit()
-    except FileNotFoundError:
-        pass
+    # ✅ Update sessions
+    if old_session_info.empty:
+        new_sessions = session_info
+        analyzed_data = {}
+    else:
+        session_info, analyzed_data, new_sessions = update_sessions(old_session_info, old_analyzed_data, session_info)
+        if new_sessions.empty:
+            print("No new sessions to process.")
+            exit()
 
     # Process each mouse and session
-    for mouse_id in session_info.mouse_id.unique():
-        mouse_sessions = session_info[session_info.mouse_id == mouse_id]
+    for mouse_id in new_sessions.mouse_id.unique():
+        mouse_sessions = new_sessions[new_sessions.mouse_id == mouse_id]
         for idx_date, date in enumerate(mouse_sessions.date.unique()):
             sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
             for idx, metadata in sessions.iterrows():
@@ -234,15 +219,14 @@ if __name__ == "__main__":
                 )
                 trial_info, all_trial_info = preprocess_data(trial_info)
 
-                condition = (session_info.mouse_id == mouse_id) & (session_info.date == date) & (session_info.session == metadata.session)
+                condition = (new_sessions.mouse_id == mouse_id) & (new_sessions.date == date) & (new_sessions.session == metadata.session)
 
-                # Skip sessions with less than 100 attempted trials
+                # Skip sessions with less than 50 attempted trials
                 if all_trial_info.shape[0] < 50:
-                    # drop the row from session_info
-                    session_info = session_info.drop(session_info[condition].index)
+                    new_sessions = new_sessions[~condition]
                     continue
 
-                session_info.loc[condition, ["total_attempts", "total_valid", "session_accuracy", "total_reward", "sensory_noise"]] = [
+                new_sessions.loc[condition, ["total_attempts", "total_valid", "session_accuracy", "total_reward", "sensory_noise"]] = [
                     max(trial_info.idx_attempt),
                     max(trial_info.idx_valid),
                     np.nanmean(trial_info.outcome) * 100,
@@ -255,28 +239,17 @@ if __name__ == "__main__":
                 all_trial_idx, right_active_block_starts, right_active_block_ends, left_active_block_starts, left_active_block_ends = get_active_block_vars(all_trial_info)
                 all_data_rolling_bias = get_all_rolling_bias(all_trial_info, window=20)
 
-                analyzed_data[metadata.session_uuid] = {
-                    "binned_trials": trial_info.idx_valid,
-                    "binned_accuracies": np.array((100 * trial_info.outcome.rolling(window=20).mean())),
-                    "rolling_trials": trial_info.idx_valid,
-                    "rolling_bias": np.array(trial_info.choice.rolling(window=20).mean()),
-                    "coherences": coherences,
-                    "accuracy": accuracies,
-                    "reaction_time_mean": reaction_time_mean,
-                    "reaction_time_median": reaction_time_median,
-                    "reaction_time_sd": reaction_time_sd,
-                    # all trials rolling bias plot
-                    "all_data_idx": all_trial_idx,
-                    "all_data_rolling_bias": all_data_rolling_bias,
-                    "all_data_choice": all_trial_info.choice,
-                    "right_active_block_starts": right_active_block_starts,
-                    "right_active_block_ends": right_active_block_ends,
-                    "left_active_block_starts": left_active_block_starts,
-                    "left_active_block_ends": left_active_block_ends,
-                }
+                analyzed_data[metadata.session_uuid] = process_analyzed_data(all_trial_info, trial_info)
 
-    # Save the updated DataFrame to a new CSV file
-    session_info.to_csv(Path(PROCESSED_DATA_DIR / "session_info.csv"), index=False)
-    # save master_dict as pickle file
-    with open(Path(PROCESSED_DATA_DIR / "analyzed_data.pkl"), "wb") as f:
+
+    updated_session_info = pd.concat([session_info, new_sessions], ignore_index=True)
+    updated_session_info.drop_duplicates(subset=["session_uuid"], keep="last", inplace=True)
+    updated_session_info.to_csv(PROCESSED_DATA_DIR / "session_info.csv", index=False)
+    # ✅ Save updated analyzed data
+    with open(PROCESSED_DATA_DIR / "analyzed_data.pkl", "wb") as f:
         pickle.dump(analyzed_data, f)
+
+    print(f"Processing complete. {len(new_sessions)} new sessions added.")
+
+
+
