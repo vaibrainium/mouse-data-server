@@ -217,32 +217,32 @@ if __name__ == "__main__":
                 trial_info = pd.read_csv(
                     SHARED_DATA_DIR / mouse_id / "data/random_dot_motion" / metadata.experiment / metadata.session / f"{mouse_id}_trial.csv"
                 )
-                trial_info, all_trial_info = preprocess_data(trial_info)
+                valid_trial_info, all_trial_info = preprocess_data(trial_info)
 
                 condition = (new_sessions.mouse_id == mouse_id) & (new_sessions.date == date) & (new_sessions.session == metadata.session)
 
                 # Skip sessions with less than 50 attempted trials
                 if all_trial_info.shape[0] < 50:
-                    new_sessions = new_sessions[~condition]
+                    new_sessions = new_sessions.loc[~condition]
                     continue
 
                 new_sessions.loc[condition, ["total_attempts", "total_valid", "session_accuracy", "total_reward", "sensory_noise"]] = [
-                    max(trial_info.idx_attempt),
-                    max(trial_info.idx_valid),
-                    np.nanmean(trial_info.outcome) * 100,
-                    np.sum(trial_info.trial_reward).astype(int),
+                    max(valid_trial_info.idx_attempt),
+                    max(valid_trial_info.idx_valid),
+                    np.nanmean(valid_trial_info.outcome) * 100,
+                    np.sum(valid_trial_info.trial_reward).astype(int),
                     get_sensory_noise(all_trial_info),
                 ]
 
-                coherences, accuracies = pmf_utils.get_accuracy_data(trial_info)
-                _, reaction_time_median, reaction_time_mean, reaction_time_sd = pmf_utils.get_chronometric_data(trial_info)
+                coherences, accuracies = pmf_utils.get_accuracy_data(valid_trial_info)
+                _, reaction_time_median, reaction_time_mean, reaction_time_sd = pmf_utils.get_chronometric_data(valid_trial_info)
                 all_trial_idx, right_active_block_starts, right_active_block_ends, left_active_block_starts, left_active_block_ends = get_active_block_vars(all_trial_info)
                 all_data_rolling_bias = get_all_rolling_bias(all_trial_info, window=20)
 
-                analyzed_data[metadata.session_uuid] = process_analyzed_data(all_trial_info, trial_info)
+                analyzed_data[metadata.session_uuid] = process_analyzed_data(all_trial_info, valid_trial_info)
 
 
-    updated_session_info = pd.concat([session_info, new_sessions], ignore_index=True)
+    updated_session_info = pd.concat([old_session_info, new_sessions], ignore_index=True)
     updated_session_info.drop_duplicates(subset=["session_uuid"], keep="last", inplace=True)
     updated_session_info.to_csv(PROCESSED_DATA_DIR / "session_info.csv", index=False)
     # ✅ Save updated analyzed data
