@@ -9,6 +9,8 @@ import os
 import dotenv
 dotenv.load_dotenv()
 
+# TODO: Add LLM to summarize comments
+
 PROCESSED_DATA_DIR = Path(os.getenv("PROCESSED_DATA_DIR"))
 
 # Constants
@@ -264,6 +266,15 @@ def plot_all_trials_rolling_performance(fig, data, session_idx, row, col):
     fig.update_xaxes(title="Trial Number", range=[0, len(session_data['all_data_idx'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
     fig.update_yaxes(title="Rolling Bias", range=[-1.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 
+def add_observations(comment):
+    st.markdown(f"""
+        <div style='border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9;'>
+            <h5 style='color: #333;'>Observations:</h5>
+            <p style='font-size: 16px; color: #555;'>{comment}</p>
+        </div>
+        """,
+        unsafe_allow_html=True)
+    # st.markdown("<br><br><br>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
 
@@ -325,18 +336,20 @@ if __name__ == "__main__":
                         start_weights.append(int(metadata.start_weight))
                         experiments.append(metadata.experiment.replace("_", " ").title())
 
-                        title += f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, Start Weight: {int(metadata.start_weight)}%<br>"
+                        title += f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, Start Weight: {int(metadata.start_weight)}%"
+                        st.markdown(f"<h3 style='text-align: center;'>{title}</h3>", unsafe_allow_html=True)
+                        add_observations(metadata.comments)
 
                         plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
                         plot_accuracy_vs_coherence(fig, session_data, session_idx=idx, row=1, col=2)
                         plot_all_trials_rolling_performance(fig, session_data, session_idx=idx, row=1, col=3)
 
                     fig.update_layout(
-                        title=title,
+                        title="",
                         title_x=0,
                         title_y=0.98,
                         title_font=dict(size=16, family="Arial"),
-                        title_pad=dict(t=2),
+                        title_pad=dict(t=0), #dict(t=2),
                         showlegend=True,
                         height=600,
                         width=900,
@@ -347,6 +360,9 @@ if __name__ == "__main__":
                         ]
                     )
                     st.plotly_chart(fig)
+
+
+
 
             else:
                 st.warning("No data available for the selected date range.")

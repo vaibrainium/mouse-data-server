@@ -45,7 +45,7 @@ def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=Non
             raise ValueError("Invalid start_date or end_date format.")
 
     session_data = []
-    required_cols = ["date", "start_weight", "end_weight", "baseline_weight", "experiment", "session", "session_uuid"]
+    required_cols = ["date", "start_weight", "end_weight", "baseline_weight", "protocol", "experiment", "session", "session_uuid"]
 
     for mouse in mouse_ids:
         history_path = mouse / "history.csv"
@@ -215,23 +215,27 @@ if __name__ == "__main__":
             sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
             for idx, metadata in sessions.iterrows():
                 trial_info = pd.read_csv(
-                    SHARED_DATA_DIR / mouse_id / "data/random_dot_motion" / metadata.experiment / metadata.session / f"{mouse_id}_trial.csv"
+                    SHARED_DATA_DIR / mouse_id / "data" / metadata.protocol / metadata.experiment / metadata.session / f"{mouse_id}_trial.csv"
                 )
                 valid_trial_info, all_trial_info = preprocess_data(trial_info)
-
                 condition = (new_sessions.mouse_id == mouse_id) & (new_sessions.date == date) & (new_sessions.session == metadata.session)
-
                 # Skip sessions with less than 50 attempted trials
                 if all_trial_info.shape[0] < 50:
                     new_sessions = new_sessions.loc[~condition]
                     continue
 
-                new_sessions.loc[condition, ["total_attempts", "total_valid", "session_accuracy", "total_reward", "sensory_noise"]] = [
+                summary_info = pd.read_csv(
+                    SHARED_DATA_DIR / mouse_id / "data" / metadata.protocol / metadata.experiment / f"{mouse_id}_summary.csv"
+                )
+                summary_row = summary_info[summary_info.session_uuid == metadata.session_uuid]
+
+                new_sessions.loc[condition, ["total_attempts", "total_valid", "session_accuracy", "total_reward", "sensory_noise", "comments"]] = [
                     max(valid_trial_info.idx_attempt),
                     max(valid_trial_info.idx_valid),
                     np.nanmean(valid_trial_info.outcome) * 100,
                     np.sum(valid_trial_info.trial_reward).astype(int),
                     get_sensory_noise(all_trial_info),
+                    summary_row.comments.values[0] if not summary_row.empty else None,
                 ]
 
                 coherences, accuracies = pmf_utils.get_accuracy_data(valid_trial_info)
