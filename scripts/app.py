@@ -268,13 +268,12 @@ def plot_all_trials_rolling_performance(fig, data, session_idx, row, col):
 
 def add_observations(comment):
     st.markdown(f"""
-        <div style='border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9;'>
-            <h5 style='color: #333;'>Observations:</h5>
-            <p style='font-size: 16px; color: #555;'>{comment}</p>
+        <div style='border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9; margin-bottom: 50px;'>
+            <h5 style='color: #333;'>Notes:</h5>
+            <p style='font-size: 16px; color: #777;'>{comment}</p>
         </div>
         """,
         unsafe_allow_html=True)
-    # st.markdown("<br><br><br>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
 
@@ -296,7 +295,6 @@ if __name__ == "__main__":
 
             if not filtered_sessions.empty:
                 selected_mouse = display_mouse_selection(filtered_sessions)
-
                 mouse_sessions = filtered_sessions[filtered_sessions.mouse_id == selected_mouse].sort_values(by="date", ascending=False)
 
                 # Plot summary if date range spans more than 1 day and mouse is selected
@@ -327,6 +325,7 @@ if __name__ == "__main__":
 
                     title = f"Date: {date} <br>"
                     start_weights, experiments = [], []
+                    comments = ""
 
                     # Loop through sessions and add traces for each
                     for idx, metadata in sessions.iterrows():
@@ -336,20 +335,26 @@ if __name__ == "__main__":
                         start_weights.append(int(metadata.start_weight))
                         experiments.append(metadata.experiment.replace("_", " ").title())
 
-                        title += f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, Start Weight: {int(metadata.start_weight)}%"
-                        st.markdown(f"<h3 style='text-align: center;'>{title}</h3>", unsafe_allow_html=True)
-                        add_observations(metadata.comments)
+                        title += f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, Start Weight: {int(metadata.start_weight)}%<br>"
 
                         plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
                         plot_accuracy_vs_coherence(fig, session_data, session_idx=idx, row=1, col=2)
                         plot_all_trials_rolling_performance(fig, session_data, session_idx=idx, row=1, col=3)
 
+                        # if this is last row of the session, add comments
+                        if idx == len(sessions) - 1:
+                            comments += f"Session {idx+1}: {metadata.comments}"
+                        else:
+                            comments += f"Session {idx+1}: {metadata.comments} <br>"
+
+                    # title_bottom_margin = 25
+                    st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{title}</h3>", unsafe_allow_html=True)
                     fig.update_layout(
                         title="",
                         title_x=0,
                         title_y=0.98,
                         title_font=dict(size=16, family="Arial"),
-                        title_pad=dict(t=0), #dict(t=2),
+                        title_pad=dict(t=0),
                         showlegend=True,
                         height=600,
                         width=900,
@@ -360,6 +365,7 @@ if __name__ == "__main__":
                         ]
                     )
                     st.plotly_chart(fig)
+                    add_observations(comments)
 
 
 
