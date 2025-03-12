@@ -144,8 +144,10 @@ def plot_summary_data(data):
     plot_accuracy_vs_start_weight(fig, data, row=1, col=2)
     plot_total_valid_vs_date(fig, data, row=2, col=2)
     # Update the layout of the entire figure
+
+    st.markdown(f"<h3 style='text-align: center; margin-top: 40px;'>Summary Data</h3>", unsafe_allow_html=True)
     fig.update_layout(
-        title="Summary Data",
+        title="",
         title_x=0.5,
         title_y=0.98,
         title_font=dict(size=16, family="Arial"),
@@ -155,7 +157,7 @@ def plot_summary_data(data):
         width=600,
         annotations=[
             dict(text="Accuracy vs Date", x=0.22, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
-            dict(text="Valid Trials vs Start Weight", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
+            dict(text="Accuracy vs Start Weight", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
             dict(text="Sensory Noise vs Date", x=0.22, y=0.45, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
             dict(text="Valid Trials vs Date", x=0.8, y=0.45, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
         ]
@@ -347,7 +349,6 @@ if __name__ == "__main__":
                         else:
                             comments += f"Session {idx+1}: {metadata.comments} <br>"
 
-                    # title_bottom_margin = 25
                     st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{title}</h3>", unsafe_allow_html=True)
                     fig.update_layout(
                         title="",
