@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import plotly.subplots as sp
 import streamlit as st
 import os
+import re
 import dotenv
 dotenv.load_dotenv()
 
@@ -269,13 +270,19 @@ def plot_all_trials_rolling_performance(fig, data, session_idx, row, col):
     fig.update_yaxes(title="Rolling Bias", range=[-1.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 
 def add_observations(comment):
+    # Replace newlines with <br> for HTML formatting
+    comment = comment.replace("\n", "<br>")
+    # Highlight words between newline and ':
+    comment = re.sub(r'(<br>)(.*?):', r'\1<b style="color: #444;">\2:</b>', comment)
+
     st.markdown(f"""
-        <div style='border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9; margin-bottom: 50px;'>
-            <h5 style='color: #333;'>Notes:</h5>
-            <p style='font-size: 16px; color: #777;'>{comment}</p>
-        </div>
-        """,
-        unsafe_allow_html=True)
+    <div style='border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9; margin-bottom: 50px;'>
+        <h5 style='color: #333;'>Notes:</h5>
+        <p style='font-size: 16px; color: #777;'>{comment}</p>
+    </div>
+    """,
+    unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
 
@@ -345,9 +352,9 @@ if __name__ == "__main__":
 
                         # if this is last row of the session, add comments
                         if idx == len(sessions) - 1:
-                            comments += f"Session {idx+1}: {metadata.comments}"
+                            comments += f"Session {idx+1}: \n {metadata.comments}"
                         else:
-                            comments += f"Session {idx+1}: {metadata.comments} <br>"
+                            comments += f"Session {idx+1}: \n {metadata.comments} <br>"
 
                     st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{title}</h3>", unsafe_allow_html=True)
                     fig.update_layout(
