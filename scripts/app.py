@@ -304,19 +304,22 @@ def plot_all_trials_rolling_performance(fig, data, session_idx, row, col):
 	fig.update_xaxes(title="Trial Number", range=[0, len(session_data['all_data_idx'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 	fig.update_yaxes(title="Rolling Bias", range=[-1.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 
-def add_observations(comment):
-	# Replace newlines with <br> for HTML formatting
-	comment = comment.replace("\n", "<br>")
-	# Highlight words between newline and ':
-	comment = re.sub(r'(<br>)(.*?):', r'\1<b style="color: #444;">\2:</b>', comment)
+def add_observations(comment, unique_key):
+    # Replace newlines with <br> for HTML formatting
+    comment = comment.replace("\n", "<br>")
+    # Highlight words between newline and ':'
+    comment = re.sub(r'(<br>)(.*?):', r'\1<b style="color: #444;">\2:</b>', comment)
 
-	st.markdown(f"""
-	<div style='border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9; margin-bottom: 50px;'>
-		<h5 style='color: #333;'>Notes:</h5>
-		<p style='font-size: 16px; color: #777;'>{comment}</p>
-	</div>
-	""",
-	unsafe_allow_html=True)
+    # Use st.expander for toggling visibility
+    with st.expander("Show/Hide Notes"):
+        st.markdown(f"""
+        <div style='border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9; margin-bottom: 50px;'>
+            <h5 style='color: #333;'>Notes:</h5>
+            <p style='font-size: 16px; color: #777;'>{comment}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+
 
 
 if __name__ == "__main__":
@@ -408,7 +411,7 @@ if __name__ == "__main__":
 						]
 					)
 					st.plotly_chart(fig)
-					add_observations(comments)
+					add_observations(comments, unique_key=f"comments_{idx_date}")  # Add observations for the session
 
 
 
