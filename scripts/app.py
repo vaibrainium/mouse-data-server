@@ -21,6 +21,7 @@ COLOR = ["#d11149", "#1a8fe3", "#1ccd6a", "#e6c229", "#6610f2", "#f17105", "#65e
 
 
 # Load Data
+@st.cache_data
 def load_data():
 	"""Load session info and analyzed data."""
 	session_info = pd.read_csv(PROCESSED_DATA_DIR / "session_info.csv")
@@ -199,7 +200,7 @@ def plot_summary_data(data):
 		]
 	)
 
-	st.plotly_chart(fig)
+	st.plotly_chart(fig, use_container_width=True)
 
 def filter_sessions_by_date_range(start_date, end_date, session_info):
 	"""Filter session data based on date range."""
@@ -305,20 +306,19 @@ def plot_all_trials_rolling_performance(fig, data, session_idx, row, col):
 	fig.update_yaxes(title="Rolling Bias", range=[-1.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 
 def add_observations(comment, unique_key):
-    # Replace newlines with <br> for HTML formatting
-    comment = comment.replace("\n", "<br>")
-    # Highlight words between newline and ':'
-    comment = re.sub(r'(<br>)(.*?):', r'\1<b style="color: #444;">\2:</b>', comment)
+	# Replace newlines with <br> for HTML formatting
+	comment = comment.replace("\n", "<br>")
+	# Highlight words between newline and ':'
+	comment = re.sub(r'(<br>)(.*?):', r'\1<b style="color: #444;">\2:</b>', comment)
 
-    # Use st.expander for toggling visibility
-    with st.expander("Show/Hide Notes"):
-        st.markdown(f"""
-        <div style='border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9; margin-bottom: 50px;'>
-            <h5 style='color: #333;'>Notes:</h5>
-            <p style='font-size: 16px; color: #777;'>{comment}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
+	# Use st.expander for toggling visibility
+	with st.expander("Show/Hide Notes"):
+		st.markdown(f"""
+		<div style='border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9; margin-bottom: 50px;'>
+			<h5 style='color: #333;'>Notes:</h5>
+			<p style='font-size: 16px; color: #777;'>{comment}</p>
+		</div>
+		""", unsafe_allow_html=True)
 
 
 
@@ -348,6 +348,13 @@ if __name__ == "__main__":
 				if (end_date - start_date).days > 1 and selected_mouse:
 					plot_summary_data(mouse_sessions)
 					st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
+
+					# summary_text = summarize_session(mouse_sessions)
+					# st.markdown(f"<h4>Summary of Comments</h4>", unsafe_allow_html=True)
+					# st.markdown(f"<div style='border:1px solid #ccc; padding:10px; border-radius:5px; background:#f4f4f4;'>{summary_text}</div>", unsafe_allow_html=True)
+
+
+
 
 				for idx_date, date in enumerate(mouse_sessions.date.unique()):
 					sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
@@ -382,7 +389,12 @@ if __name__ == "__main__":
 						start_weights.append(int(metadata.start_weight))
 						experiments.append(metadata.experiment.replace("_", " ").title())
 
-						title += f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, Start Weight: {int(metadata.start_weight)}%<br>"
+						color = COLOR[idx % len(COLOR)]  # Cycle colors if needed
+						title += (
+							f"<span style='color: {color};'>"
+							f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
+							f"Start Weight: {int(metadata.start_weight)}%</span><br>"
+						)
 
 						plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
 						plot_accuracy_vs_coherence(fig, session_data, session_idx=idx, row=1, col=2)
@@ -410,7 +422,7 @@ if __name__ == "__main__":
 							dict(text="Rolling Bias vs Trial Number", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"), ),
 						]
 					)
-					st.plotly_chart(fig)
+					st.plotly_chart(fig, use_container_width=True)
 					add_observations(comments, unique_key=f"comments_{idx_date}")  # Add observations for the session
 
 
