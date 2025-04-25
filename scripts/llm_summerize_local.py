@@ -40,4 +40,3 @@ def summarize_session(filtered_df):
     if not comments.strip():
         return "No comments to summarize."
     return summarize_comments_with_ollama(comments)
-
