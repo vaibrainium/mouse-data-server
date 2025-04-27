@@ -21,7 +21,6 @@ COLOR = ["#d11149", "#1a8fe3", "#1ccd6a", "#e6c229", "#6610f2", "#f17105", "#65e
 
 
 # Load Data
-@st.cache_data
 def load_data():
 	"""Load session info and analyzed data."""
 	session_info = pd.read_csv(PROCESSED_DATA_DIR / "session_info.csv")
