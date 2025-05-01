@@ -45,7 +45,7 @@ def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=Non
 			raise ValueError("Invalid start_date or end_date format.")
 
 	session_data = []
-	required_cols = ["date", "start_weight", "end_weight", "baseline_weight", "protocol", "experiment", "session", "session_uuid"]
+	required_cols = ["date", "time", "start_weight", "end_weight", "baseline_weight", "protocol", "experiment", "session", "session_uuid"]
 
 	for mouse in mouse_ids:
 		history_path = mouse / "history.csv"
@@ -58,6 +58,7 @@ def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=Non
 		if history.empty:
 			continue
 
+		history["time"] = pd.to_datetime(history["date"], format='%H:%M:%S', errors="coerce").dt.time
 		history = history.reindex(columns=required_cols, fill_value=pd.NA)
 		history[["start_weight", "end_weight"]] = history[["start_weight", "end_weight"]].div(history["baseline_weight"], axis=0) * 100
 		history.insert(0, "mouse_id", mouse.name)
@@ -197,16 +198,17 @@ if __name__ == "__main__":
 	if session_info.empty:
 		print("No session data found. Exiting.")
 		exit()
-
+	new_sessions = session_info
+	analyzed_data = {}
 	# ✅ Update sessions
-	if old_session_info.empty:
-	    new_sessions = session_info
-	    analyzed_data = {}
-	else:
-	    session_info, analyzed_data, new_sessions = update_sessions(old_session_info, old_analyzed_data, session_info)
-	    if new_sessions.empty:
-	        print("No new sessions to process.")
-	        exit()
+	# if old_session_info.empty:
+	# 	new_sessions = session_info
+	# 	analyzed_data = {}
+	# else:
+	# 	session_info, analyzed_data, new_sessions = update_sessions(old_session_info, old_analyzed_data, session_info)
+	# 	if new_sessions.empty:
+	# 		print("No new sessions to process.")
+	# 		exit()
 
 	# Process each mouse and session
 	for mouse_id in new_sessions.mouse_id.unique():

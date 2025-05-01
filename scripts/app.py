@@ -2,6 +2,7 @@ import pickle
 from pathlib import Path
 import numpy as np
 import pandas as pd
+from datetime import datetime
 import plotly.graph_objects as go
 import plotly.subplots as sp
 import streamlit as st
@@ -11,6 +12,7 @@ import dotenv
 dotenv.load_dotenv()
 
 # TODO: Add LLM to summarize comments
+from llm_summerize_local import summarize_session
 
 PROCESSED_DATA_DIR = Path(os.getenv("PROCESSED_DATA_DIR"))
 
@@ -328,36 +330,139 @@ if __name__ == "__main__":
 	st.markdown("<h1 style='text-align: center;'>Mouse Training Data</h1>", unsafe_allow_html=True)
 
 	session_info, analyzed_data = load_data()
-	# Date Range Selection
-	start_date = st.date_input("Start Date", value=None, min_value=session_info.date.min(), max_value=session_info.date.max())
-	end_date = st.date_input("End Date", value=None, min_value=start_date, max_value=session_info.date.max())
 
-	# Ensure valid date selection
-	if start_date and end_date:
-		if start_date > end_date:
-			st.error("End date must be after start date!")
-		else:
-			filtered_sessions = filter_sessions_by_date_range(start_date, end_date, session_info)
 
+	# Inject custom CSS to increase tab font size
+	st.markdown("""
+		<style>
+		button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
+			font-size: 24px;
+		}
+		</style>
+	""", unsafe_allow_html=True)
+	# Define your tabs
+	mouse_wise, day_wise = st.tabs(["🐭 Mouse Overview", "📅 Daily Session Details"])
+
+
+	with mouse_wise:
+		# Date Range Selection
+		start_date = st.date_input("Start Date", value=None, min_value=session_info.date.min(), max_value=session_info.date.max())
+		end_date = st.date_input("End Date", value=None, min_value=start_date, max_value=session_info.date.max())
+
+		# Ensure valid date selection
+		if start_date and end_date:
+			if start_date > end_date:
+				st.error("End date must be after start date!")
+			else:
+				filtered_sessions = filter_sessions_by_date_range(start_date, end_date, session_info)
+
+				if not filtered_sessions.empty:
+					selected_mouse = display_mouse_selection(filtered_sessions)
+					mouse_sessions = filtered_sessions[filtered_sessions.mouse_id == selected_mouse].sort_values(by="date", ascending=False)
+
+					# Plot summary if date range spans more than 1 day and mouse is selected
+					if (end_date - start_date).days > 1 and selected_mouse:
+						plot_summary_data(mouse_sessions)
+						st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
+
+						summary_text = summarize_session(mouse_sessions)
+						st.markdown(f"<h4>Summary of Comments</h4>", unsafe_allow_html=True)
+						st.markdown(f"<div style='border:1px solid #ccc; padding:10px; border-radius:5px; background:#f4f4f4;'>{summary_text}</div>", unsafe_allow_html=True)
+
+
+					for idx_date, date in enumerate(mouse_sessions.date.unique()):
+						sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
+
+						# Skip sessions with low valid trials
+						if (sessions["total_valid"] < 20).all():
+							continue
+
+						# Create subplot for individual session analysis
+						fig = sp.make_subplots(
+							rows=1,
+							cols=3,
+							column_widths=[0.25, 0.25, 0.5],
+							subplot_titles=[
+								"Rolling Accuracy",
+								"Accuracy vs Coherence",
+								"All trials rolling performance"
+							],
+							shared_xaxes=True,
+							vertical_spacing=0.15,
+						)
+
+						title = f"Date: {date} <br>"
+						start_weights, experiments = [], []
+						comments = ""
+
+						# Loop through sessions and add traces for each
+						for idx, metadata in sessions.iterrows():
+							if metadata.total_valid < 10:
+								continue
+							session_data = analyzed_data[metadata.session_uuid]
+							start_weights.append(int(metadata.start_weight))
+							experiments.append(metadata.experiment.replace("_", " ").title())
+
+							color = COLOR[idx % len(COLOR)]  # Cycle colors if needed
+							title += (
+								f"<span style='color: {color};'>"
+								f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
+								f"Start Weight: {int(metadata.start_weight)}%</span><br>"
+								# f"Start Time: {metadata.time} <br>"
+							)
+
+							plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
+							plot_accuracy_vs_coherence(fig, session_data, session_idx=idx, row=1, col=2)
+							plot_all_trials_rolling_performance(fig, session_data, session_idx=idx, row=1, col=3)
+
+							# if this is last row of the session, add comments
+							if idx == len(sessions) - 1:
+								comments += f"Session {idx+1}: \n {metadata.comments}"
+							else:
+								comments += f"Session {idx+1}: \n {metadata.comments} <br>"
+
+						st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{title}</h3>", unsafe_allow_html=True)
+						fig.update_layout(
+							title="",
+							title_x=0,
+							title_y=0.98,
+							title_font=dict(size=16, family="Arial"),
+							title_pad=dict(t=0),
+							showlegend=True,
+							height=600,
+							width=900,
+							annotations=[
+								dict(text="Binned Session Accuracy", x=0.125, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
+								dict(text="Accuracy vs Coherence", x=0.375, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
+								dict(text="Rolling Bias vs Trial Number", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"), ),
+							]
+						)
+						st.plotly_chart(fig, use_container_width=True, key=f"session_plot_{idx_date}")
+						add_observations(comments, unique_key=f"comments_{idx_date}")  # Add observations for the session
+
+
+
+
+				else:
+					st.warning("No data available for the selected date range.")
+
+
+	with day_wise:
+
+		# Show date input
+		selected_date = st.date_input(
+			"Select Date",
+			value=st.session_state.get("selected_date", None),
+			min_value=session_info.date.min(),
+			max_value=session_info.date.max()
+		)
+
+		if selected_date is not None:
+			filtered_sessions = filter_sessions_by_date_range(selected_date, selected_date, session_info)
+			mouse_options = list(np.sort(filtered_sessions.mouse_id.unique()))
 			if not filtered_sessions.empty:
-				selected_mouse = display_mouse_selection(filtered_sessions)
-				mouse_sessions = filtered_sessions[filtered_sessions.mouse_id == selected_mouse].sort_values(by="date", ascending=False)
-
-				# Plot summary if date range spans more than 1 day and mouse is selected
-				if (end_date - start_date).days > 1 and selected_mouse:
-					plot_summary_data(mouse_sessions)
-					st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
-
-					# summary_text = summarize_session(mouse_sessions)
-					# st.markdown(f"<h4>Summary of Comments</h4>", unsafe_allow_html=True)
-					# st.markdown(f"<div style='border:1px solid #ccc; padding:10px; border-radius:5px; background:#f4f4f4;'>{summary_text}</div>", unsafe_allow_html=True)
-
-
-
-
-				for idx_date, date in enumerate(mouse_sessions.date.unique()):
-					sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
-
+				for mouse_idx, selected_mouse in enumerate(mouse_options):
+					sessions = filtered_sessions[(filtered_sessions.date == selected_date) & (filtered_sessions.mouse_id == selected_mouse)].reset_index()
 					# Skip sessions with low valid trials
 					if (sessions["total_valid"] < 20).all():
 						continue
@@ -376,7 +481,7 @@ if __name__ == "__main__":
 						vertical_spacing=0.15,
 					)
 
-					title = f"Date: {date} <br>"
+					title = f"Subject ID: {selected_mouse} <br>"
 					start_weights, experiments = [], []
 					comments = ""
 
@@ -387,12 +492,13 @@ if __name__ == "__main__":
 						session_data = analyzed_data[metadata.session_uuid]
 						start_weights.append(int(metadata.start_weight))
 						experiments.append(metadata.experiment.replace("_", " ").title())
-
+						start_time = datetime.strptime(metadata.time, "%H:%M:%S").time().strftime('%I:%M %p')
 						color = COLOR[idx % len(COLOR)]  # Cycle colors if needed
 						title += (
 							f"<span style='color: {color};'>"
 							f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
-							f"Start Weight: {int(metadata.start_weight)}%</span><br>"
+							f"Start Weight: {int(metadata.start_weight)}%, "
+							f"Start Time: {start_time} </span><br>"
 						)
 
 						plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
@@ -421,11 +527,5 @@ if __name__ == "__main__":
 							dict(text="Rolling Bias vs Trial Number", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"), ),
 						]
 					)
-					st.plotly_chart(fig, use_container_width=True)
-					add_observations(comments, unique_key=f"comments_{idx_date}")  # Add observations for the session
-
-
-
-
-			else:
-				st.warning("No data available for the selected date range.")
+					st.plotly_chart(fig, use_container_width=True, key=f"date_plot_{mouse_idx}")
+					add_observations(comments, unique_key=f"comments_{mouse_idx}")  # Add observations for the session
