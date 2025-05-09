@@ -201,14 +201,14 @@ if __name__ == "__main__":
 	new_sessions = session_info
 	analyzed_data = {}
 	# ✅ Update sessions
-	# if old_session_info.empty:
-	# 	new_sessions = session_info
-	# 	analyzed_data = {}
-	# else:
-	# 	session_info, analyzed_data, new_sessions = update_sessions(old_session_info, old_analyzed_data, session_info)
-	# 	if new_sessions.empty:
-	# 		print("No new sessions to process.")
-	# 		exit()
+	if old_session_info.empty:
+		new_sessions = session_info
+		analyzed_data = {}
+	else:
+		session_info, analyzed_data, new_sessions = update_sessions(old_session_info, old_analyzed_data, session_info)
+		if new_sessions.empty:
+			print("No new sessions to process.")
+			exit()
 
 	# Process each mouse and session
 	for mouse_id in new_sessions.mouse_id.unique():
@@ -258,6 +258,3 @@ if __name__ == "__main__":
 		pickle.dump(analyzed_data, f)
 
 	print(f"Processing complete. {len(new_sessions)} new sessions added.")
-
-
-

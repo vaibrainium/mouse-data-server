@@ -59,7 +59,7 @@ def plot_accuracy_vs_date(fig, data, row, col):
 	fig.add_trace(
 		go.Scatter(
 			x=data["date"],
-			y=data["left_accuracy"].astype(int),
+			y = data.dropna(subset=["left_accuracy"])["left_accuracy"].astype(int),
 			mode="lines+markers",
 			marker=dict(size=12, color=left_block_color),
 			line=dict(color=left_block_color),
@@ -74,7 +74,7 @@ def plot_accuracy_vs_date(fig, data, row, col):
 	fig.add_trace(
 		go.Scatter(
 			x=data["date"],
-			y=data["right_accuracy"].astype(int),
+			y = data.dropna(subset=["right_accuracy"])["right_accuracy"].astype(int),
 			mode="lines+markers",
 			marker=dict(size=12, color=right_block_color),
 			line=dict(color=right_block_color),
@@ -322,7 +322,6 @@ def add_observations(comment, unique_key):
 		""", unsafe_allow_html=True)
 
 
-
 if __name__ == "__main__":
 
 	# Streamlit page configuration
@@ -330,7 +329,6 @@ if __name__ == "__main__":
 	st.markdown("<h1 style='text-align: center;'>Mouse Training Data</h1>", unsafe_allow_html=True)
 
 	session_info, analyzed_data = load_data()
-
 
 	# Inject custom CSS to increase tab font size
 	st.markdown("""
@@ -343,13 +341,12 @@ if __name__ == "__main__":
 	# Define your tabs
 	mouse_wise, day_wise = st.tabs(["🐭 Mouse Overview", "📅 Daily Session Details"])
 
-
 	with mouse_wise:
-		# Date Range Selection
+  		# Date Range Selection
 		start_date = st.date_input("Start Date", value=None, min_value=session_info.date.min(), max_value=session_info.date.max())
 		end_date = st.date_input("End Date", value=None, min_value=start_date, max_value=session_info.date.max())
 
-		# Ensure valid date selection
+  		# Ensure valid date selection
 		if start_date and end_date:
 			if start_date > end_date:
 				st.error("End date must be after start date!")
@@ -363,12 +360,11 @@ if __name__ == "__main__":
 					# Plot summary if date range spans more than 1 day and mouse is selected
 					if (end_date - start_date).days > 1 and selected_mouse:
 						plot_summary_data(mouse_sessions)
-						st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
-						summary_text = summarize_session(mouse_sessions)
-						st.markdown(f"<h4>Summary of Comments</h4>", unsafe_allow_html=True)
-						st.markdown(f"<div style='border:1px solid #ccc; padding:10px; border-radius:5px; background:#f4f4f4;'>{summary_text}</div>", unsafe_allow_html=True)
-
+						# summary_text = summarize_session(mouse_sessions)
+						# st.markdown(f"<h4>Summary of Comments</h4>", unsafe_allow_html=True)
+						# st.markdown(f"<div style='border:1px solid #ccc; padding:10px; border-radius:5px; background:#f4f4f4;'>{summary_text}</div>", unsafe_allow_html=True)
+						# st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
 					for idx_date, date in enumerate(mouse_sessions.date.unique()):
 						sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
@@ -405,10 +401,9 @@ if __name__ == "__main__":
 
 							color = COLOR[idx % len(COLOR)]  # Cycle colors if needed
 							title += (
-								f"<span style='color: {color};'>"
+								f"<span style='color: {color}; font-size: 25px;'>"
 								f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
 								f"Start Weight: {int(metadata.start_weight)}%</span><br>"
-								# f"Start Time: {metadata.time} <br>"
 							)
 
 							plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
@@ -448,7 +443,6 @@ if __name__ == "__main__":
 
 
 	with day_wise:
-
 		# Show date input
 		selected_date = st.date_input(
 			"Select Date",
@@ -495,7 +489,7 @@ if __name__ == "__main__":
 						start_time = datetime.strptime(metadata.time, "%H:%M:%S").time().strftime('%I:%M %p')
 						color = COLOR[idx % len(COLOR)]  # Cycle colors if needed
 						title += (
-							f"<span style='color: {color};'>"
+							f"<span style='color: {color}; font-size: 25px;'>"
 							f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
 							f"Start Weight: {int(metadata.start_weight)}%, "
 							f"Start Time: {start_time} </span><br>"
