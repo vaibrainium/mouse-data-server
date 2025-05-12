@@ -356,15 +356,22 @@ if __name__ == "__main__":
 				if not filtered_sessions.empty:
 					selected_mouse = display_mouse_selection(filtered_sessions)
 					mouse_sessions = filtered_sessions[filtered_sessions.mouse_id == selected_mouse].sort_values(by="date", ascending=False)
+					summary_text = None
 
 					# Plot summary if date range spans more than 1 day and mouse is selected
 					if (end_date - start_date).days > 1 and selected_mouse:
 						plot_summary_data(mouse_sessions)
 
-						# summary_text = summarize_session(mouse_sessions)
-						# st.markdown(f"<h4>Summary of Comments</h4>", unsafe_allow_html=True)
-						# st.markdown(f"<div style='border:1px solid #ccc; padding:10px; border-radius:5px; background:#f4f4f4;'>{summary_text}</div>", unsafe_allow_html=True)
-						# st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
+                        # add checkbox to show/hide comments
+						if st.checkbox("Create Summary Analysis", value=False):
+							if summary_text is None:
+								# Summarize comments using LLM
+								mouse_session_data = [analyzed_data[metadata.session_uuid] for metadata in mouse_sessions.itertuples()]
+								summary_text = summarize_session(mouse_sessions, mouse_session_data)
+							if summary_text:
+								st.markdown(f"<h4>Summary of Comments</h4>", unsafe_allow_html=True)
+								st.markdown(f"<div style='border:1px solid #ccc; padding:10px; border-radius:5px; background:#f4f4f4;'>{summary_text}</div>", unsafe_allow_html=True)
+								st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
 					for idx_date, date in enumerate(mouse_sessions.date.unique()):
 						sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
