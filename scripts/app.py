@@ -363,7 +363,7 @@ if __name__ == "__main__":
 						plot_summary_data(mouse_sessions)
 
                         # add checkbox to show/hide comments
-						if st.checkbox("Create Summary Analysis", value=False):
+						if st.checkbox("Create Summary Analysis (EXPERIMENTAL)", value=False):
 							if summary_text is None:
 								# Summarize comments using LLM
 								mouse_session_data = [analyzed_data[metadata.session_uuid] for metadata in mouse_sessions.itertuples()]

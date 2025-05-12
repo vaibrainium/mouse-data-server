@@ -140,7 +140,7 @@ def comprehensive_analysis(summary_df, sessionwise_data, WEBUI_TOKEN):
     full_report = (
         f"--- Feedback Trends ---\n{structured_analysis}\n"
         # f"--- Session-Level Patterns ---\n{session_patterns}\n"
-        f"--- LLM-Based Summary ---\n{model_summary}"
+        f"--- Summary ---\n{model_summary}"
     )
 
     return full_report
