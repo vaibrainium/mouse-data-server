@@ -362,16 +362,16 @@ if __name__ == "__main__":
 					if (end_date - start_date).days > 1 and selected_mouse:
 						plot_summary_data(mouse_sessions)
 
-                        # add checkbox to show/hide comments
-						if st.checkbox("Create Summary Analysis (EXPERIMENTAL)", value=False):
-							if summary_text is None:
-								# Summarize comments using LLM
-								mouse_session_data = [analyzed_data[metadata.session_uuid] for metadata in mouse_sessions.itertuples()]
-								summary_text = summarize_session(mouse_sessions, mouse_session_data)
-							if summary_text:
-								st.markdown(f"<h4>Summary of Comments</h4>", unsafe_allow_html=True)
-								st.markdown(f"<div style='border:1px solid #ccc; padding:10px; border-radius:5px; background:#f4f4f4;'>{summary_text}</div>", unsafe_allow_html=True)
-								st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
+						# # add checkbox to show/hide comments
+						# if st.checkbox("Create Summary Analysis (EXPERIMENTAL)", value=False):
+						# 	if summary_text is None:
+						# 		# Summarize comments using LLM
+						# 		mouse_session_data = [analyzed_data[metadata.session_uuid] for metadata in mouse_sessions.itertuples()]
+						# 		summary_text = summarize_session(mouse_sessions, mouse_session_data)
+						# 	if summary_text:
+						# 		st.markdown(f"<h4>Summary of Comments</h4>", unsafe_allow_html=True)
+						# 		st.markdown(f"<div style='border:1px solid #ccc; padding:10px; border-radius:5px; background:#f4f4f4;'>{summary_text}</div>", unsafe_allow_html=True)
+						# 		st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
 					for idx_date, date in enumerate(mouse_sessions.date.unique()):
 						sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
@@ -493,13 +493,15 @@ if __name__ == "__main__":
 						session_data = analyzed_data[metadata.session_uuid]
 						start_weights.append(int(metadata.start_weight))
 						experiments.append(metadata.experiment.replace("_", " ").title())
-						start_time = datetime.strptime(metadata.time, "%H:%M:%S").time().strftime('%I:%M %p')
+						start_time = datetime.strptime(metadata.start_time, "%H:%M:%S").time().strftime('%I:%M %p')
+						end_time = datetime.strptime(metadata.end_time, "%H:%M:%S").time().strftime('%I:%M %p')
 						color = COLOR[idx % len(COLOR)]  # Cycle colors if needed
 						title += (
 							f"<span style='color: {color}; font-size: 25px;'>"
 							f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
 							f"Start Weight: {int(metadata.start_weight)}%, "
-							f"Start Time: {start_time} </span><br>"
+							f"Start Time: {start_time}, "
+       						f"End Time: {end_time}</span><br>"
 						)
 
 						plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
