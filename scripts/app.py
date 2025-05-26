@@ -2,6 +2,7 @@ import pickle
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import uuid
 from datetime import datetime
 import plotly.graph_objects as go
 import plotly.subplots as sp
@@ -104,6 +105,7 @@ def plot_accuracy_vs_date(fig, data, row, col):
 
 def plot_accuracy_vs_start_weight(fig, data, row, col):
 	"""Plot accuracy vs start weight."""
+	data = data.dropna(subset=["session_accuracy"])
 	fig.add_trace(
 		go.Scatter(
 			x=data["start_weight"].astype(int),
@@ -227,7 +229,7 @@ def plot_rolling_accuracy_vs_trial(fig, data, session_idx, row, col):
 		row=row,
 		col=col,
 	)
-	fig.update_xaxes(title="Trial Number", range=[0, len(session_data['binned_trials'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
+	fig.update_xaxes(title="Trial Number", range=[0, len(data['binned_trials'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 	fig.update_yaxes(title="Rolling Accuracy (%)", range=[-10, 105], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 
 def plot_accuracy_vs_coherence(fig, data, session_idx, row, col):
@@ -235,7 +237,7 @@ def plot_accuracy_vs_coherence(fig, data, session_idx, row, col):
 		go.Bar(
 			x=data["coherences"],
 			y=data["accuracy"] * 100,
-			name=f"Session {idx+1}",
+			name=f"Session {session_idx+1}",
 			marker=dict(color=COLOR[session_idx]),
 			hovertemplate="<b>Coherence</b>: %{x}<br><b>Accuracy</b>: %{y}%<extra></extra>",
 			showlegend=False,
@@ -258,7 +260,7 @@ def plot_all_trials_choices(fig, data, session_idx, row, col):
 		row=row, col=col,
 	)
 
-def plot_all_trials_rolling_bias_and_threshold(fig, data, session_idx, row, col):
+def plot_all_trials_rolling_bias_and_threshold(fig, data, session_idx, row, col, plot_thresholds=True):
 	fig.add_trace(
 		go.Scatter(
 			x=data["all_data_idx"],
@@ -272,17 +274,18 @@ def plot_all_trials_rolling_bias_and_threshold(fig, data, session_idx, row, col)
 		),
 		row=row, col=col,
 	)
-	for threshold in [0.25, -0.25]:
-		fig.add_trace(
-			go.Scatter(
-				x=[0, max(data["all_data_idx"])],
-				y=[threshold, threshold],
-				mode="lines",
-				line=dict(color="black", dash="dash"),
-				name=f"Threshold {threshold}",
-			),
-				row=row, col=col,
-		)
+	if plot_thresholds:
+		for threshold in [0.25, -0.25]:
+			fig.add_trace(
+				go.Scatter(
+					x=[0, max(data["all_data_idx"])],
+					y=[threshold, threshold],
+					mode="lines",
+					line=dict(color="black", dash="dash"),
+					name=f"Threshold {threshold}",
+				),
+					row=row, col=col,
+			)
 
 def plot_all_trials_active_block_bands(fig, data, session_idx, row, col):
 	if (data["right_active_block_starts"]) or (data["left_active_block_starts"]):
@@ -303,7 +306,7 @@ def plot_all_trials_rolling_performance(fig, data, session_idx, row, col):
 	plot_all_trials_choices(fig, data, session_idx, row, col)
 	plot_all_trials_rolling_bias_and_threshold(fig, data, session_idx, row, col)
 	plot_all_trials_active_block_bands(fig, data, session_idx, row, col)
-	fig.update_xaxes(title="Trial Number", range=[0, len(session_data['all_data_idx'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
+	fig.update_xaxes(title="Trial Number", range=[0, len(data['all_data_idx'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 	fig.update_yaxes(title="Rolling Bias", range=[-1.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 
 def add_observations(comment, unique_key):
@@ -321,6 +324,146 @@ def add_observations(comment, unique_key):
 		</div>
 		""", unsafe_allow_html=True)
 
+def plot_basic_data(sessions, analyzed_data, date, mouse_id=None, identifier=None):
+	"""Plot rolling bias for all sessions on a given date and mouse."""
+	# Create subplot
+	fig = sp.make_subplots(
+		rows=1,
+		cols=1,
+		subplot_titles=["All trials rolling performance"],
+		shared_xaxes=True,
+		vertical_spacing=0.15,
+	)
+
+	# Build session info title
+	if identifier == "date":
+		title = f"Date: {date} <br>"
+	elif identifier == "mouse_id":
+		title = f"Mouse: {mouse_id} <br>"
+	else:
+		title = f"Mouse: {mouse_id} \t\t Date: {date} <br>"
+	comments = ""
+
+	# Loop through sessions
+	for idx, metadata in sessions.iterrows():
+		if metadata.total_valid < 10:
+			continue
+
+		session_data = analyzed_data.get(metadata.session_uuid)
+		if session_data is None:
+			continue
+
+		color = COLOR[idx % len(COLOR)]
+		title += (
+			f"<span style='color: {color}; font-size: 25px;'>"
+			f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
+			f"Start Weight: {int(metadata.start_weight)}%</span><br>"
+		)
+
+		st.write("entered once")
+		plot_all_trials_rolling_bias_and_threshold(fig, session_data, session_idx=idx, row=1, col=1, plot_thresholds=False)
+		plot_all_trials_choices(fig, session_data, session_idx=idx, row=1, col=1)
+
+	# Display session info and plot
+	st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{title}</h3>", unsafe_allow_html=True)
+	fig.update_layout(
+		height=600,
+		width=500,
+		showlegend=True,
+		yaxis=dict(
+			range=[-1, 1],
+			zeroline=True,
+			zerolinewidth=2,
+			zerolinecolor='black'
+		),
+		xaxis=dict(
+			zeroline=True,
+			zerolinewidth=2,
+			zerolinecolor='black'
+		),
+		annotations=[
+			dict(
+				text="Rolling Bias vs Trial Number",
+				x=0.5, y=1.05, xref="paper", yref="paper",
+				showarrow=False, font=dict(size=18, color="black")
+			),
+		]
+	)
+		# Center the chart using Streamlit columns
+	col1, col2, col3 = st.columns([1, 2, 1])
+	with col2:
+		st.plotly_chart(fig, use_container_width=True, key=str(uuid.uuid4()))
+	add_observations(comments, unique_key=f"comments_{uuid.uuid4()}")
+
+def plot_rdk_data(sessions, analyzed_data, date, mouse_id=None, identifier=None):
+	"""Plot RDK data for a given date and mouse."""
+	# Create subplot for individual session analysis
+	fig = sp.make_subplots(
+		rows=1,
+		cols=3,
+		column_widths=[0.25, 0.25, 0.5],
+		subplot_titles=[
+			"Rolling Accuracy",
+			"Accuracy vs Coherence",
+			"All trials rolling performance"
+		],
+		shared_xaxes=True,
+		vertical_spacing=0.15,
+	)
+
+	# Build session info title
+	if identifier == "date":
+		title = f"Date: {date} <br>"
+	elif identifier == "mouse_id":
+		title = f"Mouse: {mouse_id} <br>"
+	else:
+		title = f"Mouse: {mouse_id} \t\t Date: {date} <br>"
+	start_weights, experiments = [], []
+	comments = ""
+
+	# Loop through sessions and add traces for each
+	for idx, metadata in sessions.iterrows():
+		if metadata.total_valid < 10:
+			continue
+		session_data = analyzed_data[metadata.session_uuid]
+		start_weights.append(int(metadata.start_weight))
+		experiments.append(metadata.experiment.replace("_", " ").title())
+
+		color = COLOR[idx % len(COLOR)]  # Cycle colors if needed
+		title += (
+			f"<span style='color: {color}; font-size: 25px;'>"
+			f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
+			f"Start Weight: {int(metadata.start_weight)}%</span><br>"
+		)
+
+		plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
+		plot_accuracy_vs_coherence(fig, session_data, session_idx=idx, row=1, col=2)
+		plot_all_trials_rolling_performance(fig, session_data, session_idx=idx, row=1, col=3)
+
+		# if this is last row of the session, add comments
+		if idx == len(sessions) - 1:
+			comments += f"Session {idx+1}: \n {metadata.comments}"
+		else:
+			comments += f"Session {idx+1}: \n {metadata.comments} <br>"
+
+	st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{title}</h3>", unsafe_allow_html=True)
+	fig.update_layout(
+		title="",
+		title_x=0,
+		title_y=0.98,
+		title_font=dict(size=16, family="Arial"),
+		title_pad=dict(t=0),
+		showlegend=True,
+		height=600,
+		width=900,
+		annotations=[
+			dict(text="Binned Session Accuracy", x=0.125, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
+			dict(text="Accuracy vs Coherence", x=0.375, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
+			dict(text="Rolling Bias vs Trial Number", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"), ),
+		]
+	)
+	st.plotly_chart(fig, use_container_width=True, key=str(uuid.uuid4()))
+	add_observations(comments, unique_key=f"comments_{uuid.uuid4()}")  # Add observations for the session
 
 if __name__ == "__main__":
 
@@ -375,73 +518,10 @@ if __name__ == "__main__":
 
 					for idx_date, date in enumerate(mouse_sessions.date.unique()):
 						sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
-
-						# Skip sessions with low valid trials
-						if (sessions["total_valid"] < 20).all():
-							continue
-
-						# Create subplot for individual session analysis
-						fig = sp.make_subplots(
-							rows=1,
-							cols=3,
-							column_widths=[0.25, 0.25, 0.5],
-							subplot_titles=[
-								"Rolling Accuracy",
-								"Accuracy vs Coherence",
-								"All trials rolling performance"
-							],
-							shared_xaxes=True,
-							vertical_spacing=0.15,
-						)
-
-						title = f"Date: {date} <br>"
-						start_weights, experiments = [], []
-						comments = ""
-
-						# Loop through sessions and add traces for each
-						for idx, metadata in sessions.iterrows():
-							if metadata.total_valid < 10:
-								continue
-							session_data = analyzed_data[metadata.session_uuid]
-							start_weights.append(int(metadata.start_weight))
-							experiments.append(metadata.experiment.replace("_", " ").title())
-
-							color = COLOR[idx % len(COLOR)]  # Cycle colors if needed
-							title += (
-								f"<span style='color: {color}; font-size: 25px;'>"
-								f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
-								f"Start Weight: {int(metadata.start_weight)}%</span><br>"
-							)
-
-							plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
-							plot_accuracy_vs_coherence(fig, session_data, session_idx=idx, row=1, col=2)
-							plot_all_trials_rolling_performance(fig, session_data, session_idx=idx, row=1, col=3)
-
-							# if this is last row of the session, add comments
-							if idx == len(sessions) - 1:
-								comments += f"Session {idx+1}: \n {metadata.comments}"
-							else:
-								comments += f"Session {idx+1}: \n {metadata.comments} <br>"
-
-						st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{title}</h3>", unsafe_allow_html=True)
-						fig.update_layout(
-							title="",
-							title_x=0,
-							title_y=0.98,
-							title_font=dict(size=16, family="Arial"),
-							title_pad=dict(t=0),
-							showlegend=True,
-							height=600,
-							width=900,
-							annotations=[
-								dict(text="Binned Session Accuracy", x=0.125, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
-								dict(text="Accuracy vs Coherence", x=0.375, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
-								dict(text="Rolling Bias vs Trial Number", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"), ),
-							]
-						)
-						st.plotly_chart(fig, use_container_width=True, key=f"session_plot_{idx_date}")
-						add_observations(comments, unique_key=f"comments_{idx_date}")  # Add observations for the session
-
+						if sessions.experiment.unique() in ["rt_directional_training", "rt_maintenance", "rt_test"]:
+							plot_rdk_data(sessions, analyzed_data, date, identifier="date")
+						elif sessions.experiment.unique() in ["reward_spout_association", "free_reward_training"]:
+							plot_basic_data(sessions, analyzed_data, date, identifier="date")
 
 
 
@@ -464,71 +544,77 @@ if __name__ == "__main__":
 			if not filtered_sessions.empty:
 				for mouse_idx, selected_mouse in enumerate(mouse_options):
 					sessions = filtered_sessions[(filtered_sessions.date == selected_date) & (filtered_sessions.mouse_id == selected_mouse)].reset_index()
-					# Skip sessions with low valid trials
-					if (sessions["total_valid"] < 20).all():
-						continue
 
-					# Create subplot for individual session analysis
-					fig = sp.make_subplots(
-						rows=1,
-						cols=3,
-						column_widths=[0.25, 0.25, 0.5],
-						subplot_titles=[
-							"Rolling Accuracy",
-							"Accuracy vs Coherence",
-							"All trials rolling performance"
-						],
-						shared_xaxes=True,
-						vertical_spacing=0.15,
-					)
+					if sessions.experiment.unique() in ["rt_directional_training", "rt_maintenance", "rt_test"]:
+						plot_rdk_data(sessions, analyzed_data, selected_date, selected_mouse, identifier="mouse_id")
+					elif sessions.experiment.unique() in ["reward_spout_association", "free_reward_training"]:
+						plot_basic_data(sessions, analyzed_data, selected_date, selected_mouse, identifier="mouse_id")
+					# # Skip sessions with low valid trials
+					# if (sessions["total_valid"] < 10).all():
+					# 	continue
 
-					title = f"Subject ID: {selected_mouse} <br>"
-					start_weights, experiments = [], []
-					comments = ""
 
-					# Loop through sessions and add traces for each
-					for idx, metadata in sessions.iterrows():
-						if metadata.total_valid < 10:
-							continue
-						session_data = analyzed_data[metadata.session_uuid]
-						start_weights.append(int(metadata.start_weight))
-						experiments.append(metadata.experiment.replace("_", " ").title())
-						start_time = datetime.strptime(metadata.start_time, "%H:%M:%S").time().strftime('%I:%M %p')
-						end_time = datetime.strptime(metadata.end_time, "%H:%M:%S").time().strftime('%I:%M %p')
-						color = COLOR[idx % len(COLOR)]  # Cycle colors if needed
-						title += (
-							f"<span style='color: {color}; font-size: 25px;'>"
-							f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
-							f"Start Weight: {int(metadata.start_weight)}%, "
-							f"Start Time: {start_time}, "
-       						f"End Time: {end_time}</span><br>"
-						)
+					# # Create subplot for individual session analysis
+					# fig = sp.make_subplots(
+					# 	rows=1,
+					# 	cols=3,
+					# 	column_widths=[0.25, 0.25, 0.5],
+					# 	subplot_titles=[
+					# 		"Rolling Accuracy",
+					# 		"Accuracy vs Coherence",
+					# 		"All trials rolling performance"
+					# 	],
+					# 	shared_xaxes=True,
+					# 	vertical_spacing=0.15,
+					# )
 
-						plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
-						plot_accuracy_vs_coherence(fig, session_data, session_idx=idx, row=1, col=2)
-						plot_all_trials_rolling_performance(fig, session_data, session_idx=idx, row=1, col=3)
+					# title = f"Subject ID: {selected_mouse} <br>"
+					# start_weights, experiments = [], []
+					# comments = ""
 
-						# if this is last row of the session, add comments
-						if idx == len(sessions) - 1:
-							comments += f"Session {idx+1}: \n {metadata.comments}"
-						else:
-							comments += f"Session {idx+1}: \n {metadata.comments} <br>"
+					# # Loop through sessions and add traces for each
+					# for idx, metadata in sessions.iterrows():
+					# 	if metadata.total_valid < 10:
+					# 		continue
+					# 	session_data = analyzed_data[metadata.session_uuid]
+					# 	start_weights.append(int(metadata.start_weight))
+					# 	experiments.append(metadata.experiment.replace("_", " ").title())
+					# 	start_time = datetime.strptime(metadata.start_time, "%H:%M:%S").time().strftime('%I:%M %p')
+					# 	end_time = datetime.strptime(metadata.end_time, "%H:%M:%S").time().strftime('%I:%M %p')
+					# 	color = COLOR[idx % len(COLOR)]  # Cycle colors if needed
+					# 	title += (
+					# 		f"<span style='color: {color}; font-size: 25px;'>"
+					# 		f"Session {idx+1}: {metadata.experiment.replace('_', ' ').title()}, "
+					# 		f"Start Weight: {int(metadata.start_weight)}%, "
+					# 		f"Start Time: {start_time}, "
+	   				# 		f"End Time: {end_time}</span><br>"
+					# 	)
 
-					st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{title}</h3>", unsafe_allow_html=True)
-					fig.update_layout(
-						title="",
-						title_x=0,
-						title_y=0.98,
-						title_font=dict(size=16, family="Arial"),
-						title_pad=dict(t=0),
-						showlegend=True,
-						height=600,
-						width=900,
-						annotations=[
-							dict(text="Binned Session Accuracy", x=0.125, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
-							dict(text="Accuracy vs Coherence", x=0.375, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
-							dict(text="Rolling Bias vs Trial Number", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"), ),
-						]
-					)
-					st.plotly_chart(fig, use_container_width=True, key=f"date_plot_{mouse_idx}")
-					add_observations(comments, unique_key=f"comments_{mouse_idx}")  # Add observations for the session
+					# 	plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
+					# 	plot_accuracy_vs_coherence(fig, session_data, session_idx=idx, row=1, col=2)
+					# 	plot_all_trials_rolling_performance(fig, session_data, session_idx=idx, row=1, col=3)
+
+					# 	# if this is last row of the session, add comments
+					# 	if idx == len(sessions) - 1:
+					# 		comments += f"Session {idx+1}: \n {metadata.comments}"
+					# 	else:
+					# 		comments += f"Session {idx+1}: \n {metadata.comments} <br>"
+
+					# st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{title}</h3>", unsafe_allow_html=True)
+					# fig.update_layout(
+					# 	title="",
+					# 	title_x=0,
+					# 	title_y=0.98,
+					# 	title_font=dict(size=16, family="Arial"),
+					# 	title_pad=dict(t=0),
+					# 	showlegend=True,
+					# 	height=600,
+					# 	width=900,
+					# 	annotations=[
+					# 		dict(text="Binned Session Accuracy", x=0.125, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
+					# 		dict(text="Accuracy vs Coherence", x=0.375, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
+					# 		dict(text="Rolling Bias vs Trial Number", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"), ),
+					# 	]
+					# )
+					# st.plotly_chart(fig, use_container_width=True, key=f"date_plot_{mouse_idx}")
+					# add_observations(comments, unique_key=f"comments_{mouse_idx}")  # Add observations for the session
