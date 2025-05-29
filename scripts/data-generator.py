@@ -217,11 +217,12 @@ def process_rdk_analysis(meta, new_sessions, analyzed_data):
 
 		condition = (new_sessions.mouse_id == mouse_id) & (new_sessions.date == date) & (new_sessions.session == meta.session)
 		new_sessions.loc[condition, [
-			"start_time", "end_time", "total_attempts", "total_valid", "session_accuracy",
+			"start_time", "end_time", "configuration_used", "total_attempts", "total_valid", "session_accuracy",
 			"left_accuracy", "right_accuracy", "total_reward", "sensory_noise", "comments"
 		]] = [
 			safe_time_parse(start_time_raw),
 			safe_time_parse(end_time_raw),
+			summary_row.configuration.values[0] if not summary_row.empty else None,
 			max(valid_trials.idx_attempt) if not valid_trials.idx_attempt.empty else np.nan,
 			max(valid_trials.idx_valid) if not valid_trials.idx_valid.empty else np.nan,
 			safe_nanmean(valid_trials.outcome) * 100,
@@ -244,9 +245,10 @@ def process_basic_analysis(meta, new_sessions, analyzed_data):
 	end_time_raw = summary_row.end_time.values[0] if not summary_row.empty else None
 
 	condition = (new_sessions.mouse_id == mouse_id) & (new_sessions.date == date) & (new_sessions.session == meta.session)
-	new_sessions.loc[condition, ["start_time", "end_time", "total_attempts", "total_reward", "comments", "session_accuracy", "sensory_noise", "total_valid"]] = [
+	new_sessions.loc[condition, ["start_time", "end_time", "configuration_used", "total_attempts", "total_reward", "comments", "session_accuracy", "sensory_noise", "total_valid"]] = [
 		safe_time_parse(start_time_raw),
 		safe_time_parse(end_time_raw),
+		summary_row.configuration.values[0] if not summary_row.empty else None,
 		max(all_trials.idx_attempt) if not all_trials.idx_attempt.empty else np.nan,
 		int(np.nansum(all_trials.trial_reward)),
 		summary_row.comments.values[0] if not summary_row.empty else None,
