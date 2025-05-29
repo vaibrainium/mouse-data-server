@@ -348,8 +348,8 @@ def build_title(sessions, identifier, date, mouse_id):
 			f"Session {idx + 1}: {metadata.experiment.replace('_', ' ').title()}, "
 			f"Start Weight: {int(metadata.start_weight)}%</span><br>"
 		)
-		# if metadata.configuration_used is not None:
-		if metadata.configuration_used:
+		# if metadata contains 'configuration_used' and it's not none:
+		if 'configuration_used' in metadata and pd.notna(metadata.configuration_used):
 			configuration = metadata.configuration_used.replace("_", "-").lower()
 			title_html += f"<span style='color: {color}; font-size: 20px;'>Configuration: {configuration}</span><br>"
 
