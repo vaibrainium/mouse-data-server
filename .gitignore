@@ -13,3 +13,4 @@ wheels/
 .env
 data
 .streamlit
+*.log

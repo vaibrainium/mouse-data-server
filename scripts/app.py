@@ -15,7 +15,10 @@ dotenv.load_dotenv()
 # TODO: Add LLM to summarize comments
 from llm_summerize_local import summarize_session
 
-PROCESSED_DATA_DIR = Path(os.getenv("PROCESSED_DATA_DIR"))
+PROCESSED_DATA_DIR_STR = os.getenv("PROCESSED_DATA_DIR")
+if not PROCESSED_DATA_DIR_STR:
+	raise ValueError("Environment variable PROCESSED_DATA_DIR must be set.")
+PROCESSED_DATA_DIR = Path(PROCESSED_DATA_DIR_STR)
 
 # Constants
 TEXTWIDTH = 5.0
@@ -25,12 +28,19 @@ COLOR = ["#d11149", "#1a8fe3", "#1ccd6a", "#e6c229", "#6610f2", "#f17105", "#65e
 
 # Load Data
 def load_data():
-	"""Load session info and analyzed data."""
-	session_info = pd.read_csv(PROCESSED_DATA_DIR / "session_info.csv")
-	session_info["date"] = pd.to_datetime(session_info["date"]).dt.date
-	with open(PROCESSED_DATA_DIR / "analyzed_data.pkl", "rb") as f:
-		analyzed_data = pickle.load(f)
-	return session_info, analyzed_data
+	"""Load session info and analyzed data with error handling."""
+	try:
+		session_info = pd.read_csv(PROCESSED_DATA_DIR / "session_info.csv")
+		session_info["date"] = pd.to_datetime(session_info["date"]).dt.date
+		with open(PROCESSED_DATA_DIR / "analyzed_data.pkl", "rb") as f:
+			analyzed_data = pickle.load(f)
+		return session_info, analyzed_data
+	except FileNotFoundError as e:
+		st.error(f"Data files not found: {e}")
+		st.stop()
+	except Exception as e:
+		st.error(f"Error loading data: {e}")
+		st.stop()
 
 def create_subplots():
 	"""Create the main subplot grid for accuracy and valid trials."""
@@ -51,51 +61,63 @@ def create_subplots():
 	return fig
 
 def plot_accuracy_vs_date(fig, data, row, col):
-	"""Plot accuracy over time."""
+	"""Plot accuracy over time with improved error handling."""
+	if data.empty:
+		return
+
 	threshold = 80
 	right_block_color = "rgba(255, 0, 0, 0.5)"  # Red with transparency
 	left_block_color = "rgba(0, 0, 255, 0.5)"  # Blue with transparency
 
 	# Left accuracy trace
-	fig.add_trace(
-		go.Scatter(
-			x=data["date"],
-			y = data.dropna(subset=["left_accuracy"])["left_accuracy"].astype(int),
-			mode="lines+markers",
-			marker=dict(size=12, color=left_block_color),
-			line=dict(color=left_block_color),
-			hovertemplate="<b>Date</b>: %{x}<br><b>Left Accuracy</b>: %{y}%<extra></extra>",
-			showlegend=False,
-		),
-		row=row,
-		col=col,
-	)
+	left_data = data.dropna(subset=["left_accuracy"])
+	if not left_data.empty:
+		fig.add_trace(
+			go.Scatter(
+				x=left_data["date"],
+				y=left_data["left_accuracy"].astype(int),
+				mode="lines+markers",
+				marker=dict(size=12, color=left_block_color),
+				line=dict(color=left_block_color),
+				hovertemplate="<b>Date</b>: %{x}<br><b>Left Accuracy</b>: %{y}%<extra></extra>",
+				showlegend=False,
+				name="Left Accuracy"
+			),
+			row=row,
+			col=col,
+		)
 
 	# Right accuracy trace
-	fig.add_trace(
-		go.Scatter(
-			x=data["date"],
-			y = data.dropna(subset=["right_accuracy"])["right_accuracy"].astype(int),
-			mode="lines+markers",
-			marker=dict(size=12, color=right_block_color),
-			line=dict(color=right_block_color),
-			hovertemplate="<b>Date</b>: %{x}<br><b>Right Accuracy</b>: %{y}%<extra></extra>",
-			showlegend=False,
-		),
-		row=row,
-		col=col,
-	)
+	right_data = data.dropna(subset=["right_accuracy"])
+	if not right_data.empty:
+		fig.add_trace(
+			go.Scatter(
+				x=right_data["date"],
+				y=right_data["right_accuracy"].astype(int),
+				mode="lines+markers",
+				marker=dict(size=12, color=right_block_color),
+				line=dict(color=right_block_color),
+				hovertemplate="<b>Date</b>: %{x}<br><b>Right Accuracy</b>: %{y}%<extra></extra>",
+				showlegend=False,
+				name="Right Accuracy"
+			),
+			row=row,
+			col=col,
+		)
 
-	fig.add_trace(
-		go.Scatter(
-			x=[min(data["date"]), max(data["date"])],
-			y=[threshold, threshold],
-			mode="lines",
-			line=dict(color="black", dash="dash"),
-			name=f"Threshold {threshold}",
-		),
+	# Add threshold line if we have date data
+	if not data.empty:
+		fig.add_trace(
+			go.Scatter(
+				x=[min(data["date"]), max(data["date"])],
+				y=[threshold, threshold],
+				mode="lines",
+				line=dict(color="black", dash="dash"),
+				name=f"Threshold {threshold}%",
+				showlegend=False,
+			),
 			row=row, col=col,
-	)
+		)
 
 	# Update axes only once
 	fig.update_xaxes(title_text="Date", tickformat="%Y-%m-%d", row=row, col=col)
@@ -104,12 +126,15 @@ def plot_accuracy_vs_date(fig, data, row, col):
 					 zerolinewidth=2, mirror=True, row=row, col=col)
 
 def plot_accuracy_vs_start_weight(fig, data, row, col):
-	"""Plot accuracy vs start weight."""
-	data = data.dropna(subset=["session_accuracy"])
+	"""Plot accuracy vs start weight with improved error handling."""
+	clean_data = data.dropna(subset=["session_accuracy", "start_weight"])
+	if clean_data.empty:
+		return
+
 	fig.add_trace(
 		go.Scatter(
-			x=data["start_weight"].astype(int),
-			y=data["session_accuracy"].astype(int),
+			x=clean_data["start_weight"].astype(int),
+			y=clean_data["session_accuracy"].astype(int),
 			mode="markers",
 			marker=dict(size=12),
 			line=dict(color=COLOR[5]),
@@ -123,11 +148,15 @@ def plot_accuracy_vs_start_weight(fig, data, row, col):
 	fig.update_yaxes(title="Accuracy (%)", range=[0, 105], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 
 def plot_total_valid_vs_date(fig, data, row, col):
-	"""Plot total valid trials over time."""
+	"""Plot total valid trials over time with improved error handling."""
+	clean_data = data.dropna(subset=["total_valid"])
+	if clean_data.empty:
+		return
+
 	fig.add_trace(
 		go.Scatter(
-			x=data["date"],
-			y=data["total_valid"].astype(int),
+			x=clean_data["date"],
+			y=clean_data["total_valid"].astype(int),
 			mode="lines+markers",
 			marker=dict(size=12),
 			line=dict(color=COLOR[5]),
@@ -141,11 +170,15 @@ def plot_total_valid_vs_date(fig, data, row, col):
 	fig.update_yaxes(title="Total Valid Trials", zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 
 def plot_sensory_noise_vs_date(fig, data, row, col):
-	"""Plot total valid trials vs start weight."""
+	"""Plot sensory noise over time with improved error handling."""
+	clean_data = data.dropna(subset=["sensory_noise"])
+	if clean_data.empty:
+		return
+
 	fig.add_trace(
 		go.Scatter(
-			x=data["date"],
-			y=data["sensory_noise"],
+			x=clean_data["date"],
+			y=clean_data["sensory_noise"],
 			mode="lines+markers",
 			marker=dict(size=12),
 			line=dict(color=COLOR[5]),
@@ -330,30 +363,30 @@ def add_observations(comment, unique_key):
 		""", unsafe_allow_html=True)
 
 def build_title(sessions, identifier, date, mouse_id):
-	"""Build HTML-formatted session title with metadata."""
-	title_parts = []
-	if identifier == "date":
-		title_parts.append(f"Date: {date}")
-	elif identifier == "mouse_id":
-		title_parts.append(f"Mouse: {mouse_id}")
-	else:
-		title_parts.append(f"Mouse: {mouse_id} &nbsp;&nbsp; Date: {date}")
+    """Build HTML-formatted session title with metadata."""
+    title_parts = []
+    if identifier == "date":
+        title_parts.append(f"Date: {date}")
+    elif identifier == "mouse_id":
+        title_parts.append(f"Mouse: {mouse_id}")
+    else:
+        title_parts.append(f"Mouse: {mouse_id} &nbsp;&nbsp; Date: {date}")
 
-	title_html = f"{' <br> '.join(title_parts)} <br>"
+    title_html = f"{' <br> '.join(title_parts)} <br>"
 
-	for idx, metadata in sessions.iterrows():
-		color = COLOR[idx % len(COLOR)]
-		title_html += (
-			f"<span style='color: {color}; font-size: 25px;'>"
-			f"Session {idx + 1}: {metadata.experiment.replace('_', ' ').title()}, "
-			f"Start Weight: {int(metadata.start_weight)}%</span><br>"
-		)
-		# if metadata contains 'configuration_used' and it's not none:
-		if 'configuration_used' in metadata and pd.notna(metadata.configuration_used):
-			configuration = metadata.configuration_used.replace("_", "-").lower()
-			title_html += f"<span style='color: {color}; font-size: 20px;'>Configuration: {configuration}</span><br>"
-
-	return title_html
+    for idx, metadata in sessions.iterrows():
+        color = COLOR[idx % len(COLOR)]
+        title_html += (
+            f"<span style='color: {color}; font-size: 25px;'>"
+            f"Session {idx + 1}: {metadata.experiment.replace('_', ' ').title()}, "
+            f"Start Weight: {int(metadata.start_weight)}%"
+        )
+        # if metadata contains 'configuration_used' and it's not none:
+        if 'configuration_used' in metadata and pd.notna(metadata.configuration_used):
+            configuration = metadata.configuration_used.replace("_", "-").lower()
+            title_html += f", Configuration: {configuration}"
+        title_html += "</span><br>"
+    return title_html
 
 def collect_comments(sessions):
 	"""Aggregate comments from all sessions with formatting."""
@@ -370,6 +403,7 @@ def plot_basic_data(sessions, analyzed_data, date, mouse_id=None, identifier=Non
 		shared_xaxes=True, vertical_spacing=0.15,
 	)
 
+	session_data = None
 	for idx, metadata in sessions.iterrows():
 		if metadata.total_valid < 10:
 			continue
@@ -381,8 +415,9 @@ def plot_basic_data(sessions, analyzed_data, date, mouse_id=None, identifier=Non
 		plot_all_trials_rolling_bias_and_threshold(fig, session_data, session_idx=idx, row=1, col=1, plot_thresholds=False)
 		plot_all_trials_choices(fig, session_data, session_idx=idx, row=1, col=1)
 
-	fig.update_xaxes(title="Trial Number", range=[0, len(session_data['all_data_idx'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True)
-	fig.update_yaxes(title="Rolling Bias", range=[-1.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True)
+	if session_data is not None:
+		fig.update_xaxes(title="Trial Number", range=[0, len(session_data['all_data_idx'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True)
+		fig.update_yaxes(title="Rolling Bias", range=[-1.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True)
 
 	st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{build_title(sessions, identifier, date, mouse_id)}</h3>", unsafe_allow_html=True)
 
@@ -482,10 +517,18 @@ if __name__ == "__main__":
 
 					for idx_date, date in enumerate(mouse_sessions.date.unique()):
 						sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
-						if sessions.experiment.unique() in ["rt_directional_training", "rt_maintenance", "rt_test"]:
+						experiment_types = sessions.experiment.unique()
+
+						# Check if any RDK experiments are present
+						rdk_experiments = ["rt_directional_training", "rt_maintenance", "rt_test", "rt_dynamic_training"]
+						basic_experiments = ["reward_spout_association", "free_reward_training"]
+
+						if any(exp in rdk_experiments for exp in experiment_types):
 							plot_rdk_data(sessions, analyzed_data, date, identifier="date")
-						elif sessions.experiment.unique() in ["reward_spout_association", "free_reward_training"]:
+						elif any(exp in basic_experiments for exp in experiment_types):
 							plot_basic_data(sessions, analyzed_data, date, identifier="date")
+						else:
+							st.warning(f"Unknown experiment type(s) for {date}: {experiment_types}")
 				else:
 					st.warning("No data available for the selected date range.")
 
@@ -506,7 +549,18 @@ if __name__ == "__main__":
 				for mouse_idx, selected_mouse in enumerate(mouse_options):
 					sessions = filtered_sessions[(filtered_sessions.date == selected_date) & (filtered_sessions.mouse_id == selected_mouse)].reset_index()
 
-					if sessions.experiment.unique() in ["rt_directional_training", "rt_maintenance", "rt_test"]:
-						plot_rdk_data(sessions, analyzed_data, selected_date, selected_mouse, identifier="mouse_id")
-					elif sessions.experiment.unique() in ["reward_spout_association", "free_reward_training"]:
-						plot_basic_data(sessions, analyzed_data, selected_date, selected_mouse, identifier="mouse_id")
+					if not sessions.empty:
+						experiment_types = sessions.experiment.unique()
+
+						# Check if any RDK experiments are present
+						rdk_experiments = ["rt_directional_training", "rt_maintenance", "rt_test", "rt_dynamic_training"]
+						basic_experiments = ["reward_spout_association", "free_reward_training"]
+
+						if any(exp in rdk_experiments for exp in experiment_types):
+							plot_rdk_data(sessions, analyzed_data, selected_date, selected_mouse, identifier="mouse_id")
+						elif any(exp in basic_experiments for exp in experiment_types):
+							plot_basic_data(sessions, analyzed_data, selected_date, selected_mouse, identifier="mouse_id")
+						else:
+							st.warning(f"Unknown experiment type(s) for {selected_mouse} on {selected_date}: {experiment_types}")
+			else:
+				st.warning("No data available for the selected date.")
