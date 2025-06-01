@@ -369,7 +369,7 @@ if __name__ == "__main__":
 
                 if meta.experiment in ["rt_directional_training", "rt_maintenance", "rt_test", "rt_dynamic_training"]:
                     process_rdk_analysis(meta, new_sessions, analyzed_data, mouse_id, date, trial_path, summary_path)
-                elif meta.experiment in ["free_reward_training", "reward_spout_association"]:
+                elif meta.experiment in ["free_reward_training", "reward_spout_association", "reward_spout_stimulus_association"]:
                     process_basic_analysis(meta, new_sessions, analyzed_data, mouse_id, date, trial_path, summary_path)
                 else:
                     print(f"Unknown experiment type '{meta.experiment}' for {meta.mouse_id} on {meta.date}. Skipping.")

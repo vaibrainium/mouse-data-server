@@ -521,7 +521,7 @@ if __name__ == "__main__":
 
 						# Check if any RDK experiments are present
 						rdk_experiments = ["rt_directional_training", "rt_maintenance", "rt_test", "rt_dynamic_training"]
-						basic_experiments = ["reward_spout_association", "free_reward_training"]
+						basic_experiments = ['reward_spout_stimulus_association', "reward_spout_association", "free_reward_training"]
 
 						if any(exp in rdk_experiments for exp in experiment_types):
 							plot_rdk_data(sessions, analyzed_data, date, identifier="date")
@@ -554,7 +554,7 @@ if __name__ == "__main__":
 
 						# Check if any RDK experiments are present
 						rdk_experiments = ["rt_directional_training", "rt_maintenance", "rt_test", "rt_dynamic_training"]
-						basic_experiments = ["reward_spout_association", "free_reward_training"]
+						basic_experiments = ["reward_spout_stimulus_association", "reward_spout_association", "free_reward_training"]
 
 						if any(exp in rdk_experiments for exp in experiment_types):
 							plot_rdk_data(sessions, analyzed_data, selected_date, selected_mouse, identifier="mouse_id")
