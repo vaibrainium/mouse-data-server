@@ -363,30 +363,30 @@ def add_observations(comment, unique_key):
 		""", unsafe_allow_html=True)
 
 def build_title(sessions, identifier, date, mouse_id):
-    """Build HTML-formatted session title with metadata."""
-    title_parts = []
-    if identifier == "date":
-        title_parts.append(f"Date: {date}")
-    elif identifier == "mouse_id":
-        title_parts.append(f"Mouse: {mouse_id}")
-    else:
-        title_parts.append(f"Mouse: {mouse_id} &nbsp;&nbsp; Date: {date}")
+	"""Build HTML-formatted session title with metadata."""
+	title_parts = []
+	if identifier == "date":
+		title_parts.append(f"Date: {date}")
+	elif identifier == "mouse_id":
+		title_parts.append(f"Mouse: {mouse_id}")
+	else:
+		title_parts.append(f"Mouse: {mouse_id} &nbsp;&nbsp; Date: {date}")
 
-    title_html = f"{' <br> '.join(title_parts)} <br>"
+	title_html = f"{' <br> '.join(title_parts)} <br>"
 
-    for idx, metadata in sessions.iterrows():
-        color = COLOR[idx % len(COLOR)]
-        title_html += (
-            f"<span style='color: {color}; font-size: 25px;'>"
-            f"Session {idx + 1}: {metadata.experiment.replace('_', ' ').title()}, "
-            f"Start Weight: {int(metadata.start_weight)}%"
-        )
-        # if metadata contains 'configuration_used' and it's not none:
-        if 'configuration_used' in metadata and pd.notna(metadata.configuration_used):
-            configuration = metadata.configuration_used.replace("_", "-").lower()
-            title_html += f", Configuration: {configuration}"
-        title_html += "</span><br>"
-    return title_html
+	for idx, metadata in sessions.iterrows():
+		color = COLOR[idx % len(COLOR)]
+		title_html += (
+			f"<span style='color: {color}; font-size: 25px;'>"
+			f"Session {idx + 1}: {metadata.experiment.replace('_', ' ').title()}, "
+			f"Start Weight: {int(metadata.start_weight)}%"
+		)
+		# if metadata contains 'configuration_used' and it's not none:
+		if 'configuration_used' in metadata and pd.notna(metadata.configuration_used):
+			configuration = metadata.configuration_used.replace("_", "-").lower()
+			title_html += f", Configuration: {configuration}"
+		title_html += "</span><br>"
+	return title_html
 
 def collect_comments(sessions):
 	"""Aggregate comments from all sessions with formatting."""
@@ -404,6 +404,7 @@ def plot_basic_data(sessions, analyzed_data, date, mouse_id=None, identifier=Non
 	)
 
 	session_data = None
+	x_len = 0
 	for idx, metadata in sessions.iterrows():
 		if metadata.total_valid < 10:
 			continue
@@ -412,11 +413,12 @@ def plot_basic_data(sessions, analyzed_data, date, mouse_id=None, identifier=Non
 		if session_data is None:
 			continue
 
+		x_len = max(x_len, len(session_data['all_data_idx']))
 		plot_all_trials_rolling_bias_and_threshold(fig, session_data, session_idx=idx, row=1, col=1, plot_thresholds=False)
 		plot_all_trials_choices(fig, session_data, session_idx=idx, row=1, col=1)
 
 	if session_data is not None:
-		fig.update_xaxes(title="Trial Number", range=[0, len(session_data['all_data_idx'])], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True)
+		fig.update_xaxes(title="Trial Number", range=[0, x_len], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True)
 		fig.update_yaxes(title="Rolling Bias", range=[-1.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True)
 
 	st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{build_title(sessions, identifier, date, mouse_id)}</h3>", unsafe_allow_html=True)
