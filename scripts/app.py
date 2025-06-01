@@ -378,14 +378,15 @@ def build_title(sessions, identifier, date, mouse_id):
 		color = COLOR[idx % len(COLOR)]
 		title_html += (
 			f"<span style='color: {color}; font-size: 25px;'>"
-			f"Session {idx + 1}: {metadata.experiment.replace('_', ' ').title()}, "
-			f"Start Weight: {int(metadata.start_weight)}%"
+			f"Session {idx + 1} - Phase:{metadata.experiment.replace('_', ' ').title()}, "
 		)
 		# if metadata contains 'configuration_used' and it's not none:
 		if 'configuration_used' in metadata and pd.notna(metadata.configuration_used):
 			configuration = metadata.configuration_used.replace("_", "-").lower()
-			title_html += f", Configuration: {configuration}"
-		title_html += "</span><br>"
+			title_html += f"Config: {configuration}, "
+
+		title_html += f"Start Weight: {int(metadata.start_weight)}%</span><br>"
+
 	return title_html
 
 def collect_comments(sessions):
