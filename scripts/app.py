@@ -378,7 +378,7 @@ def build_title(sessions, identifier, date, mouse_id):
 		color = COLOR[idx % len(COLOR)]
 		title_html += (
 			f"<span style='color: {color}; font-size: 25px;'>"
-			f"Session {idx + 1} - Phase:{metadata.experiment.replace('_', ' ').title()}, "
+			f"Session {idx + 1} - {metadata.rig_id.replace('_', ' ').title()}, Phase: {metadata.experiment.replace('_', ' ').title()}, "
 		)
 		# if metadata contains 'configuration_used' and it's not none:
 		if 'configuration_used' in metadata and pd.notna(metadata.configuration_used):

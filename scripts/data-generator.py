@@ -100,7 +100,7 @@ def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=Non
             raise ValueError("Invalid start_date or end_date format.")
 
     session_data = []
-    required_cols = ["date", "start_weight", "end_weight", "baseline_weight", "protocol", "experiment", "session", "session_uuid"]
+    required_cols = ["date", "start_weight", "end_weight", "baseline_weight", "rig_id", "protocol", "experiment", "session", "session_uuid"]
 
     for mouse in mouse_ids:
         history_path = mouse / "history.csv"
@@ -124,7 +124,7 @@ def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=Non
                     continue
 
                 # Check required values
-                if pd.isna(row_data[["start_weight", "end_weight", "baseline_weight", "protocol", "experiment", "session", "session_uuid"]]).any():
+                if pd.isna(row_data[["start_weight", "end_weight", "baseline_weight", "rig_id", "protocol", "experiment", "session", "session_uuid"]]).any():
                     continue
 
                 if row_data["baseline_weight"] == 0:
@@ -135,6 +135,7 @@ def get_recent_sessions(last_X_business_days=None, start_date=None, end_date=Non
                 row_data["end_weight"] = float(row_data["end_weight"]) / float(row_data["baseline_weight"]) * 100
                 row_data["date"] = date_parsed
                 row_data["mouse_id"] = mouse.name
+                row_data["rig_id"] = row_data["rig_id"]
 
                 valid_rows.append(row_data)
             except Exception as e:
