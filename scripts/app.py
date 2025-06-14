@@ -385,7 +385,27 @@ def build_title(sessions, identifier, date, mouse_id):
 			configuration = metadata.configuration_used.replace("_", "-").lower()
 			title_html += f"Config: {configuration}, "
 
-		title_html += f"Start Weight: {int(metadata.start_weight)}%</span><br>"
+		# Format start_time to HH:MM AM/PM
+		if pd.notna(metadata.start_time):
+			if isinstance(metadata.start_time, str):
+				# Try to parse string to datetime
+				try:
+					start_time_dt = datetime.strptime(metadata.start_time, "%H:%M:%S")
+					formatted_time = start_time_dt.strftime("%I:%M %p")
+				except ValueError:
+					try:
+						start_time_dt = datetime.strptime(metadata.start_time, "%H:%M")
+						formatted_time = start_time_dt.strftime("%I:%M %p")
+					except ValueError:
+						formatted_time = metadata.start_time  # fallback to original
+			else:
+				# Assume it's already a datetime object
+				formatted_time = metadata.start_time.strftime("%I:%M %p")
+		else:
+			formatted_time = "N/A"
+
+		title_html += f"Start Weight: {int(metadata.start_weight)}%,  Start Time: {formatted_time}</span><br>"
+
 
 	return title_html
 
