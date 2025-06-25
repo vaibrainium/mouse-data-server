@@ -218,21 +218,21 @@ def plot_summary_data(data):
     plot_total_valid_vs_date(fig, data, row=2, col=2)
     # Update the layout of the entire figure
 
-    st.markdown("### 📊 Summary Dashboard", unsafe_allow_html=True)
-
+    st.markdown(f"<h3 style='text-align: center; margin-top: 40px;'>Summary Data</h3>", unsafe_allow_html=True)
     fig.update_layout(
         title="",
+        title_x=0.5,
+        title_y=0.98,
+        title_font=dict(size=16, family="Arial"),
+        title_pad=dict(t=2),
         showlegend=True,
-        height=800,
-        font=dict(size=12, family="Arial"),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=80, r=80, t=100, b=80),
+        height=900,
+        width=600,
         annotations=[
-            dict(text="Accuracy vs Date", x=0.22, y=1.08, xref="paper", yref="paper", showarrow=False, font=dict(size=16, color="black", family="Arial")),
-            dict(text="Accuracy vs Start Weight", x=0.78, y=1.08, xref="paper", yref="paper", showarrow=False, font=dict(size=16, color="black", family="Arial")),
-            dict(text="Sensory Noise vs Date", x=0.22, y=0.45, xref="paper", yref="paper", showarrow=False, font=dict(size=16, color="black", family="Arial")),
-            dict(text="Valid Trials vs Date", x=0.78, y=0.45, xref="paper", yref="paper", showarrow=False, font=dict(size=16, color="black", family="Arial")),
+            dict(text="Accuracy vs Date", x=0.22, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
+            dict(text="Accuracy vs Start Weight", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
+            dict(text="Sensory Noise vs Date", x=0.22, y=0.45, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
+            dict(text="Valid Trials vs Date", x=0.8, y=0.45, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black"),),
         ]
     )
 
@@ -243,26 +243,9 @@ def filter_sessions_by_date_range(start_date, end_date, session_info):
     return session_info[(session_info.date >= start_date) & (session_info.date <= end_date)]
 
 def display_mouse_selection(filtered_sessions):
-    """Display mouse selection dropdown with enhanced styling."""
+    """Display mouse selection dropdown."""
     mouse_options = [None] + list(np.sort(filtered_sessions.mouse_id.unique()))
-
-    # Create columns for better layout
-    col1, col2 = st.columns([2, 1])
-
-    with col1:
-        selected_mouse = st.selectbox(
-            "🐭 Select Mouse",
-            options=mouse_options,
-            format_func=lambda x: "Choose a mouse..." if x is None else f"Mouse {x}",
-            help="Select a mouse to view detailed analysis"
-        )
-
-    with col2:
-        if selected_mouse:
-            mouse_session_count = len(filtered_sessions[filtered_sessions.mouse_id == selected_mouse])
-            st.metric("Sessions", mouse_session_count)
-
-    return selected_mouse
+    return st.selectbox("Select Mouse", options=mouse_options)
 
 def plot_rolling_accuracy_vs_trial(fig, data, session_idx, row, col):
     fig.add_trace(
@@ -387,7 +370,7 @@ def plot_psych(fig, data, session_idx, row, col):
         row=row, col=col,
     )
 
-    fig.update_yaxes(range=[-0.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
+    fig.update_yaxes(title="Rolling Bias", range=[-0.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True, row=row, col=col)
 
 def format_comments(comments):
     """Format comments with HTML line breaks and bold section headers."""
@@ -400,28 +383,12 @@ def format_comments(comments):
 
 def add_observations(comment, unique_key):
     """Display formatted comments inside a styled Streamlit expander."""
-    if not comment or comment.strip() == "":
-        return
-
     formatted = format_comments(comment)
-    with st.expander("📝 Session Notes & Observations", expanded=False):
+    with st.expander("Show/Hide Notes"):
         st.markdown(f"""
-        <div style='
-            border: 2px solid #e1e5e9;
-            padding: 20px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-            margin: 15px 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        '>
-            <div style='
-                color: #2c3e50;
-                font-size: 16px;
-                line-height: 1.6;
-                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            '>
-                {formatted}
-            </div>
+        <div style='border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9; margin-bottom: 50px;'>
+            <h5 style='color: #333;'>Notes:</h5>
+            <p style='font-size: 16px; color: #777;'>{formatted}</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -516,50 +483,22 @@ def plot_basic_data(sessions, analyzed_data, date, mouse_id=None, identifier=Non
         fig.update_xaxes(title="Trial Number", range=[0, x_len], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True)
         fig.update_yaxes(title="Rolling Bias", range=[-1.05, 1.05], zeroline=True, zerolinecolor="black", zerolinewidth=2, mirror=True)
 
-    st.markdown(f"""
-    <div style='
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        padding: 20px;
-        border-radius: 15px;
-        margin: 20px 0 30px 0;
-        border-left: 5px solid #4a90e2;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    '>
-        <h3 style='
-            color: #2c3e50;
-            margin: 0 0 15px 0;
-            font-weight: 600;
-            font-size: 1.4rem;
-        '>{build_title(sessions, identifier, date, mouse_id, session_data)}</h3>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{build_title(sessions, identifier, date, mouse_id, session_data)}</h3>", unsafe_allow_html=True)
 
     fig.update_layout(
-        height=600,
-        showlegend=True,
-        font=dict(size=12),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=60, r=60, t=80, b=60),
-        annotations=[dict(
-            text="Rolling Bias vs Trial Number",
-            x=0.5, y=1.08,
-            xref="paper", yref="paper",
-            showarrow=False,
-            font=dict(size=18, color="black", family="Arial"),
-            xanchor='center'
-        )]
+        height=600, width=500, showlegend=True,
+        annotations=[dict(text="Rolling Bias vs Trial Number", x=0.5, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=18, color="black"))]
     )
 
-    # Center the plot with better responsive design
-    st.plotly_chart(fig, use_container_width=True, key=str(uuid.uuid4()))
+    with st.columns([1, 2, 1])[1]:
+        st.plotly_chart(fig, use_container_width=True, key=str(uuid.uuid4()))
 
     add_observations(collect_comments(sessions), unique_key=f"comments_{uuid.uuid4()}")
 
 def plot_rdk_data(sessions, analyzed_data, date, mouse_id=None, identifier=None):
     """Plot RDK session metrics including accuracy and performance."""
     fig = sp.make_subplots(
-        rows=1, cols=4, column_widths=[0.3, 0.3, 0.5, 0.4],
+        rows=1, cols=3, column_widths=[0.25, 0.25, 0.5],
         subplot_titles=["Rolling Accuracy", "Accuracy vs Coherence", "All trials rolling performance"],
         shared_xaxes=True, vertical_spacing=0.15,
     )
@@ -575,117 +514,33 @@ def plot_rdk_data(sessions, analyzed_data, date, mouse_id=None, identifier=None)
         plot_rolling_accuracy_vs_trial(fig, session_data, session_idx=idx, row=1, col=1)
         plot_accuracy_vs_coherence(fig, session_data, session_idx=idx, row=1, col=2)
         plot_all_trials_rolling_performance(fig, session_data, session_idx=idx, row=1, col=3)
-        plot_psych(fig, session_data, session_idx=idx, row=1, col=4)
 
-    st.markdown(f"""
-    <div style='
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        padding: 20px;
-        border-radius: 15px;
-        margin: 20px 0 30px 0;
-        border-left: 5px solid #4a90e2;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    '>
-        <h3 style='
-            color: #2c3e50;
-            margin: 0 0 15px 0;
-            font-weight: 600;
-            font-size: 1.4rem;
-        '>{build_title(sessions, identifier, date, mouse_id, session_data)}</h3>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align: left; margin-top: 30px; margin-bottom: -70px;'>{build_title(sessions, identifier, date, mouse_id, session_data)}</h3>", unsafe_allow_html=True)
 
     fig.update_layout(
-        height=600,
-        showlegend=True,
-        font=dict(size=12),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=60, r=60, t=100, b=60),
+        height=600, width=900, showlegend=True,
         annotations=[
-            dict(text="Binned Session Accuracy", x=0.15, y=1.08, xref="paper", yref="paper", showarrow=False, font=dict(size=16, color="black", family="Arial")),
-            dict(text="Accuracy vs Coherence", x=0.45, y=1.08, xref="paper", yref="paper", showarrow=False, font=dict(size=16, color="black", family="Arial")),
-            dict(text="Rolling Bias vs Trial Number", x=0.75, y=1.08, xref="paper", yref="paper", showarrow=False, font=dict(size=16, color="black", family="Arial")),
-            dict(text="Psychometric Function", x=0.95, y=1.08, xref="paper", yref="paper", showarrow=False, font=dict(size=16, color="black", family="Arial")),
+            dict(text="Binned Session Accuracy", x=0.125, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black")),
+            dict(text="Accuracy vs Coherence", x=0.375, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black")),
+            dict(text="Rolling Bias vs Trial Number", x=0.8, y=1.05, xref="paper", yref="paper", showarrow=False, font=dict(size=20, color="black")),
         ]
     )
     st.plotly_chart(fig, use_container_width=True, key=str(uuid.uuid4()))
     add_observations(collect_comments(sessions), unique_key=f"comments_{uuid.uuid4()}")
 
 if __name__ == "__main__":
-    # Streamlit page configuration
-    st.set_page_config(
-        page_title="Mouse Training Data Analysis",
-        layout="wide",
-        initial_sidebar_state="collapsed",
-        page_icon="🐭"
-    )
 
-    # Main title with improved styling
-    st.markdown("""
-    <div style='text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); margin: -1rem -1rem 2rem -1rem; color: white; border-radius: 0 0 20px 20px;'>
-        <h1 style='margin: 0; font-size: 3rem; font-weight: 700; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);'>
-            🐭 Mouse Training Data Analysis
-        </h1>
-        <p style='margin: 0.5rem 0 0 0; font-size: 1.2rem; opacity: 0.9;'>
-            Comprehensive behavioral analysis and performance tracking
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Streamlit page configuration
+    st.set_page_config(page_title="Mouse Training Data", layout="wide")
+    st.markdown("<h1 style='text-align: center;'>Mouse Training Data</h1>", unsafe_allow_html=True)
 
     session_info, analyzed_data = load_data()
 
-    # Enhanced CSS for better aesthetics
+    # Inject custom CSS to increase tab font size
     st.markdown("""
         <style>
-        /* Tab styling */
         button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
             font-size: 24px;
-            font-weight: 600;
-        }
-
-        /* Main container styling */
-        .main > div {
-            padding-left: 2rem;
-            padding-right: 2rem;
-            padding-top: 1rem;
-        }
-
-        /* Input controls styling */
-        .stSelectbox > div > div {
-            background-color: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .stDateInput > div > div {
-            background-color: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        /* Section spacing */
-        div[data-testid="stVerticalBlock"] > div {
-            gap: 1.5rem;
-        }
-
-        /* Improved form styling */
-        .stForm {
-            background-color: #ffffff;
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin-bottom: 2rem;
-        }
-
-        /* Warning and error message styling */
-        .stAlert {
-            border-radius: 8px;
-            margin: 1rem 0;
-        }
-
-        /* Expander styling */
-        .streamlit-expanderHeader {
-            background-color: #f8f9fa;
-            border-radius: 8px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -693,122 +548,72 @@ if __name__ == "__main__":
     mouse_wise, day_wise = st.tabs(["🐭 Mouse Overview", "📅 Daily Session Details"])
 
     with mouse_wise:
-        st.markdown("### 📊 Data Analysis Configuration", unsafe_allow_html=True)
+          # Date Range Selection
+        start_date = st.date_input("Start Date", value=None, min_value=session_info.date.min(), max_value=session_info.date.max())
+        end_date = st.date_input("End Date", value=None, min_value=start_date, max_value=session_info.date.max())
 
-        # Create a form for better organization
-        with st.form("date_range_form", clear_on_submit=False):
-            col1, col2 = st.columns(2)
-
-            with col1:
-                start_date = st.date_input(
-                    "📅 Start Date",
-                    value=None,
-                    min_value=session_info.date.min(),
-                    max_value=session_info.date.max(),
-                    help="Select the start date for analysis"
-                )
-
-            with col2:
-                end_date = st.date_input(
-                    "📅 End Date",
-                    value=None,
-                    min_value=start_date if start_date else session_info.date.min(),
-                    max_value=session_info.date.max(),
-                    help="Select the end date for analysis"
-                )
-
-            # Submit button for form
-            submitted = st.form_submit_button("Apply Date Range", type="primary")
-
-        # Ensure valid date selection
+          # Ensure valid date selection
         if start_date and end_date:
             if start_date > end_date:
-                st.error("⚠️ End date must be after start date!")
+                st.error("End date must be after start date!")
             else:
                 filtered_sessions = filter_sessions_by_date_range(start_date, end_date, session_info)
 
                 if not filtered_sessions.empty:
-                    st.markdown("---")
-                    st.markdown("### 🐭 Mouse Selection", unsafe_allow_html=True)
-
                     selected_mouse = display_mouse_selection(filtered_sessions)
+                    mouse_sessions = filtered_sessions[filtered_sessions.mouse_id == selected_mouse].sort_values(by="date", ascending=False)
+                    summary_text = None
 
-                    if selected_mouse:
-                        mouse_sessions = filtered_sessions[filtered_sessions.mouse_id == selected_mouse].sort_values(by="date", ascending=False)
-                        summary_text = None
+                    # Plot summary if date range spans more than 1 day and mouse is selected
+                    if (end_date - start_date).days > 1 and selected_mouse:
+                        plot_summary_data(mouse_sessions)
 
-                        # Add some spacing before plots
-                        st.markdown("---")
-                        st.markdown("### 📈 Analysis Results", unsafe_allow_html=True)
+                        # # add checkbox to show/hide comments
+                        # if st.checkbox("Create Summary Analysis (EXPERIMENTAL)", value=False):
+                        # 	if summary_text is None:
+                        # 		# Summarize comments using LLM
+                        # 		mouse_session_data = [analyzed_data[metadata.session_uuid] for metadata in mouse_sessions.itertuples()]
+                        # 		summary_text = summarize_session(mouse_sessions, mouse_session_data)
+                        # 	if summary_text:
+                        # 		st.markdown(f"<h4>Summary of Comments</h4>", unsafe_allow_html=True)
+                        # 		st.markdown(f"<div style='border:1px solid #ccc; padding:10px; border-radius:5px; background:#f4f4f4;'>{summary_text}</div>", unsafe_allow_html=True)
+                        # 		st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
-                        # Plot summary if date range spans more than 1 day and mouse is selected
-                        if (end_date - start_date).days > 1 and selected_mouse:
-                            plot_summary_data(mouse_sessions)
+                    for idx_date, date in enumerate(mouse_sessions.date.unique()):
+                        sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
+                        experiment_types = sessions.experiment.unique()
 
-                        for idx_date, date in enumerate(mouse_sessions.date.unique()):
-                            sessions = mouse_sessions[mouse_sessions.date == date].reset_index()
-                            experiment_types = sessions.experiment.unique()
+                        # Check if any RDK experiments are present
+                        rdk_experiments = ["rt_directional_training", "rt_maintenance", "rt_test", "rt_dynamic_training"]
+                        basic_experiments = ['reward_spout_stimulus_association', "reward_spout_association", "free_reward_training"]
 
-                            # Check if any RDK experiments are present
-                            rdk_experiments = ["rt_directional_training", "rt_maintenance", "rt_test", "rt_dynamic_training"]
-                            basic_experiments = ['reward_spout_stimulus_association', "reward_spout_association", "free_reward_training"]
-
-                            if any(exp in rdk_experiments for exp in experiment_types):
-                                plot_rdk_data(sessions, analyzed_data, date, identifier="date")
-                            elif any(exp in basic_experiments for exp in experiment_types):
-                                plot_basic_data(sessions, analyzed_data, date, identifier="date")
-                            else:
-                                st.warning(f"⚠️ Unknown experiment type(s) for {date}: {experiment_types}")
-                    else:
-                        st.info("🔍 Please select a mouse to view detailed analysis.")
+                        if any(exp in rdk_experiments for exp in experiment_types):
+                            plot_rdk_data(sessions, analyzed_data, date, identifier="date")
+                        elif any(exp in basic_experiments for exp in experiment_types):
+                            plot_basic_data(sessions, analyzed_data, date, identifier="date")
+                        else:
+                            st.warning(f"Unknown experiment type(s) for {date}: {experiment_types}")
                 else:
-                    st.warning("📭 No data available for the selected date range.")
-        else:
-            st.info("📅 Please select both start and end dates to begin analysis.")
+                    st.warning("No data available for the selected date range.")
 
 
     with day_wise:
-        st.markdown("### 📅 Daily Session Analysis", unsafe_allow_html=True)
-
-        # Create a more organized layout for date selection
-        col1, col2 = st.columns([2, 1])
-
-        with col1:
-            selected_date = st.date_input(
-                "Select Date for Analysis",
-                value=st.session_state.get("selected_date", None),
-                min_value=session_info.date.min(),
-                max_value=session_info.date.max(),
-                help="Choose a specific date to view all mouse sessions"
-            )
-
-        with col2:
-            if selected_date:
-                st.metric(
-                    "Available Sessions",
-                    len(filter_sessions_by_date_range(selected_date, selected_date, session_info))
-                )
+        # Show date input
+        selected_date = st.date_input(
+            "Select Date",
+            value=st.session_state.get("selected_date", None),
+            min_value=session_info.date.min(),
+            max_value=session_info.date.max()
+        )
 
         if selected_date is not None:
             filtered_sessions = filter_sessions_by_date_range(selected_date, selected_date, session_info)
-
+            mouse_options = list(np.sort(filtered_sessions.mouse_id.unique()))
             if not filtered_sessions.empty:
-                mouse_options = list(np.sort(filtered_sessions.mouse_id.unique()))
-
-                st.markdown("---")
-                st.markdown(f"### 🐭 Sessions for {selected_date.strftime('%B %d, %Y')}", unsafe_allow_html=True)
-
                 for mouse_idx, selected_mouse in enumerate(mouse_options):
-                    sessions = filtered_sessions[
-                        (filtered_sessions.date == selected_date) &
-                        (filtered_sessions.mouse_id == selected_mouse)
-                    ].reset_index()
+                    sessions = filtered_sessions[(filtered_sessions.date == selected_date) & (filtered_sessions.mouse_id == selected_mouse)].reset_index()
 
                     if not sessions.empty:
-                        # Add a subtle separator between mice
-                        if mouse_idx > 0:
-                            st.markdown("---")
-
                         experiment_types = sessions.experiment.unique()
 
                         # Check if any RDK experiments are present
@@ -820,8 +625,6 @@ if __name__ == "__main__":
                         elif any(exp in basic_experiments for exp in experiment_types):
                             plot_basic_data(sessions, analyzed_data, selected_date, selected_mouse, identifier="mouse_id")
                         else:
-                            st.warning(f"⚠️ Unknown experiment type(s) for {selected_mouse} on {selected_date}: {experiment_types}")
+                            st.warning(f"Unknown experiment type(s) for {selected_mouse} on {selected_date}: {experiment_types}")
             else:
-                st.warning("📭 No data available for the selected date.")
-        else:
-            st.info("📅 Please select a date to view daily session details.")
+                st.warning("No data available for the selected date.")

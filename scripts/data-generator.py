@@ -15,6 +15,7 @@ from utils import pmf_utils
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
+# set logging directory to log folder
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -195,6 +196,17 @@ def get_all_rolling_bias(data: pd.DataFrame, window=20):
 
     return accumulated_bias
 
+def get_psychometric_data(data: pd.DataFrame, model_type="logit_3"):
+    x_data, y_data, model, x_hat, y_hat = pmf_utils.get_psychometric_data(data, model_type=model_type, lapse_rate_lims=(1e-5, 0.5))
+    return {
+        "x_data": x_data,
+        "y_data": y_data,
+        "x_hat": x_hat,
+        "y_hat": y_hat,
+        "coefs_": model.coefs_ if model else None,
+    } if model else None
+
+
 
 def process_analyzed_data(all_trial_info, valid_trial_info):
     coherences, accuracies = pmf_utils.get_accuracy_data(valid_trial_info)
@@ -211,6 +223,8 @@ def process_analyzed_data(all_trial_info, valid_trial_info):
         "accuracy": accuracies,
         "reaction_time_mean": mean_rt,
         "reaction_time_median": median_rt,
+        "valid_psych_data": get_psychometric_data(valid_trial_info),
+        "all_psych_data": get_psychometric_data(all_trial_info),
         "reaction_time_sd": std_rt,
         "all_data_idx": idx,
         "all_data_rolling_bias": rolling_bias,
@@ -240,14 +254,30 @@ def update_sessions(old_info, old_data, new_info):
 
 
 def process_rdk_analysis(meta, new_sessions, analyzed_data, mouse_id, date, trial_path, summary_path):
-        trials = pd.read_csv(trial_path)
+        try:
+            trials = pd.read_csv(trial_path)
+        except Exception as e:
+            print(f"Error reading trial file {trial_path}: {e}")
+            new_sessions = new_sessions[~((new_sessions.mouse_id == mouse_id) & (new_sessions.session == meta.session))]
+            return
+
         valid_trials, all_trials = preprocess_data(trials)
         if all_trials.shape[0] < 10:
             new_sessions = new_sessions[~((new_sessions.mouse_id == mouse_id) & (new_sessions.session == meta.session))]
             print(f"Not enough trials for {mouse_id} on {date}. Skipping.")
             return
 
-        summary = pd.read_csv(summary_path)
+        try:
+            summary = pd.read_csv(summary_path, on_bad_lines='skip', quoting=1)
+        except Exception as e:
+            print(f"Error reading summary file {summary_path}: {e}")
+            try:
+                # Try with different parsing options
+                summary = pd.read_csv(summary_path, on_bad_lines='skip', sep=',', quotechar='"', skipinitialspace=True)
+            except Exception as e2:
+                print(f"Failed to read summary file with alternative parsing: {e2}")
+                new_sessions = new_sessions[~((new_sessions.mouse_id == mouse_id) & (new_sessions.session == meta.session))]
+                return
         summary_row = summary[summary.session_uuid == meta.session_uuid]
 
         start_time_raw = summary_row.start_time.values[0] if not summary_row.empty else None
@@ -302,9 +332,22 @@ def process_rdk_analysis(meta, new_sessions, analyzed_data, mouse_id, date, tria
         analyzed_data[meta.session_uuid] = process_analyzed_data(all_trials, valid_trials)
 
 def process_basic_analysis(meta, new_sessions, analyzed_data, mouse_id, date, trial_path, summary_path):
-    all_trials = pd.read_csv(trial_path)
+    try:
+        all_trials = pd.read_csv(trial_path)
+    except Exception as e:
+        print(f"Error reading trial file {trial_path}: {e}")
+        return
 
-    summary = pd.read_csv(summary_path)
+    try:
+        summary = pd.read_csv(summary_path, on_bad_lines='skip', quoting=1)
+    except Exception as e:
+        print(f"Error reading summary file {summary_path}: {e}")
+        try:
+            # Try with different parsing options
+            summary = pd.read_csv(summary_path, on_bad_lines='skip', sep=',', quotechar='"', skipinitialspace=True)
+        except Exception as e2:
+            print(f"Failed to read summary file with alternative parsing: {e2}")
+            return
     summary_row = summary[summary.session_uuid == meta.session_uuid]
 
     start_time_raw = summary_row.start_time.values[0] if not summary_row.empty else None
